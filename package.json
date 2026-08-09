@@ -1,0 +1,49 @@
+{
+  "name": "opencode-senses",
+  "version": "0.1.0",
+  "description": "Local-first multimodal augmentation for text-only OpenCode models, powered by Moondream 3.1 via Photon.",
+  "type": "module",
+  "author": "opencode-senses",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit",
+    "prepublishOnly": "bun run typecheck && bun run build",
+    "publish:npm": "npm publish"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "1.17.15",
+    "@opencode-ai/sdk": "1.17.15",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  },
+  "main": "./dist/plugin.js",
+  "exports": {
+    ".": {
+      "types": "./src/plugin.ts",
+      "import": "./dist/plugin.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "multimodal",
+    "vision",
+    "moondream",
+    "screenshot",
+    "ocr"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
