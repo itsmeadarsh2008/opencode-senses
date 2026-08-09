@@ -95,7 +95,11 @@ export class AttachmentInjector {
     }
 
     if (extra.length > 0) {
-      output.parts = [...output.parts, textPart(extra.join("\n"))];
+      // IMPORTANT: opencode's chat.message hook only persists mutations to the
+      // passed-in parts array (it recomputes `parts` from the same array after
+      // the hook resolves). Reassigning `output.parts` is silently dropped, so
+      // we must push in place.
+      output.parts.push(textPart(extra.join("\n")));
     }
   }
 
