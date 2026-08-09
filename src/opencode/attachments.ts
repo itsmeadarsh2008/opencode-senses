@@ -101,8 +101,15 @@ export class AttachmentInjector {
       // IMPORTANT: opencode's chat.message hook only persists mutations to the
       // passed-in parts array (it recomputes `parts` from the same array after
       // the hook resolves). Reassigning `output.parts` is silently dropped, so
-      // we must push in place.
-      output.parts.push(textPart(extra.join("\n")));
+      // we must push in place. The part must also be fully-formed (id prefixed
+      // "prt", matching sessionID + messageID) or opencode rejects the message.
+      output.parts.push({
+        id: "prt_" + createHash("sha1").update(`${output.message.id}:${Date.now()}:${extra.length}`).digest("hex").slice(0, 26),
+        sessionID: output.message.sessionID ?? input.sessionID,
+        messageID: output.message.id,
+        type: "text",
+        text: extra.join("\n"),
+      } as Part);
     }
   }
 
@@ -237,10 +244,6 @@ function isImageFilePart(part: Part): part is FilePart {
 
 export function isImagePart(part: Part): part is FilePart {
   return isImageFilePart(part);
-}
-
-function textPart(text: string): Part {
-  return { type: "text", text } as Part;
 }
 
 function statSafe(p: string): { size: number; mtimeMs: number } | undefined {
