@@ -37,18 +37,17 @@ export const SensesPlugin: Plugin = async (input, options) => {
     event: async ({ event }) => {
       // Analyze a clipboard/file image as soon as it's attached to a draft —
       // before the message is submitted — so `chat.message` completes fast and
-      // the model never sees a blind image part.
+      // the model never sees a blind image part. Fire-and-forget: this hook
+      // must never block the TUI while the (slow) GPU analysis runs.
       if (event.type !== "message.part.updated") return;
       if (opts.autoInspect === false) return;
       const part = (event.properties as { part?: unknown })?.part;
       if (!isImagePart(part as never)) return;
-      try {
-        await injector.preload(part as never);
-      } catch (err) {
+      void injector.preload(part as never).catch((err) => {
         if (process.env.SENSES_DEBUG === "1") {
           process.stderr.write(`[senses] preload failed: ${(err as Error).message}\n`);
         }
-      }
+      });
     },
     "chat.message": async (msgInput, msgOutput) => {
       if (opts.autoInspect === false) return;

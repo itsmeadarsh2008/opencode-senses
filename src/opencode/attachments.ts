@@ -51,21 +51,38 @@ export class AttachmentInjector {
     const images = (output.parts ?? []).filter(isImageFilePart);
     if (images.length === 0) return;
 
+    // Never block message submission on the GPU. Use cached evidence if the
+    // paste-time preload already finished; otherwise kick it off and inject
+    // whatever is available now (path hint + any partial evidence).
     const blocks: string[] = [];
     const notes: string[] = [];
     const warnings: string[] = [];
     for (const img of images) {
-      const cached = await this.readiness(img);
-      if (cached?.text) blocks.push(cached.text);
-      if (cached?.warn) warnings.push(cached.warn);
-      const materialized = this.materialize(img, this.keyFor(img));
+      const key = this.keyFor(img);
+      let record = this.cache.get(key) ?? undefined;
+      if (!record) {
+        // Start (or join) analysis in the background; expect preload to have
+        // run already at paste time. Never await it here.
+        void this.readiness(img).then((r) => {
+          if (r) {
+            this.cache.set(key, r);
+            if (this.cache.size >= this.maxCache) {
+              const oldest = this.cache.keys().next().value;
+              if (oldest !== undefined) this.cache.delete(oldest);
+            }
+          }
+        });
+      }
+      if (record?.text) blocks.push(record.text);
+      if (record?.warn) warnings.push(record.warn);
+      const materialized = this.materialize(img, key);
       if (materialized.path) notes.push(materialized.path);
     }
 
     const extra: string[] = [];
     if (blocks.length > 0) extra.push(blocks.join("\n"));
     // Always tell the model where the pasted images live on disk, even if the
-    // GPU analysis failed — it can re-inspect them with the senses tools.
+    // GPU analysis failed or is still running — it can re-inspect them.
     if (notes.length > 0) {
       extra.push(
         "\n<SENSES Atlas>\nPasted/clipboard images were materialized to disk so you can inspect them directly:\n" +
@@ -74,11 +91,7 @@ export class AttachmentInjector {
       );
     }
     if (warnings.length > 0) {
-      extra.push(
-        "\n<SENSES Notice>\n" +
-          warnings.join("\n") +
-          "\n</SENSES>\n",
-      );
+      extra.push("\n<SENSES Notice>\n" + warnings.join("\n") + "\n</SENSES>\n");
     }
 
     if (extra.length > 0) {
