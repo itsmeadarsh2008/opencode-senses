@@ -111,3 +111,19 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Python
+.venv/
+python/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist-info/
+
+# Senses runtime state
+.ruff_cache/
+.hf_cache
+.done-marker
+
+# Local build/emit artifacts
+# (dist/ is also excluded above via the generic rule)
