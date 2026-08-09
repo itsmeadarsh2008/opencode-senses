@@ -5,6 +5,10 @@
   "type": "module",
   "author": "opencode-senses",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itsmeadarsh2008/opencode-senses.git"
+  },
   "scripts": {
     "build": "bun run scripts/build.ts",
     "test": "bun test",
@@ -32,7 +36,8 @@
     "dist"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "keywords": [
     "opencode",
