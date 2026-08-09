@@ -25,6 +25,7 @@ interface ChatMessageOutput {
 
 interface InjectedEvidence {
   text: string;
+  warn?: string;
   at: number;
 }
 
@@ -52,25 +53,36 @@ export class AttachmentInjector {
 
     const blocks: string[] = [];
     const notes: string[] = [];
+    const warnings: string[] = [];
     for (const img of images) {
       const cached = await this.readiness(img);
       if (cached?.text) blocks.push(cached.text);
+      if (cached?.warn) warnings.push(cached.warn);
       const materialized = this.materialize(img, this.keyFor(img));
       if (materialized.path) notes.push(materialized.path);
     }
 
-    if (blocks.length > 0) {
-      output.parts = [...output.parts, textPart(blocks.join("\n"))];
+    const extra: string[] = [];
+    if (blocks.length > 0) extra.push(blocks.join("\n"));
+    // Always tell the model where the pasted images live on disk, even if the
+    // GPU analysis failed — it can re-inspect them with the senses tools.
+    if (notes.length > 0) {
+      extra.push(
+        "\n<SENSES Atlas>\nPasted/clipboard images were materialized to disk so you can inspect them directly:\n" +
+          notes.map((n) => `- ${n}\n`).join("") +
+          "Use senses.inspect / senses.ocr / senses.detect with the path above if you need a closer look.\n</SENSES>\n",
+      );
     }
-    if (notes.length > 0 && blocks.length > 0) {
-      output.parts = [
-        ...output.parts,
-        textPart(
-          "\n<SENSES Atlas>\nPasted/clipboard images were materialized to disk so you can inspect them directly:\n" +
-            notes.map((n) => `- ${n}\n`).join("") +
-            "Use senses.inspect / senses.ocr / senses.detect with the path above if you need a closer look.\n</SENSES>\n",
-        ),
-      ];
+    if (warnings.length > 0) {
+      extra.push(
+        "\n<SENSES Notice>\n" +
+          warnings.join("\n") +
+          "\n</SENSES>\n",
+      );
+    }
+
+    if (extra.length > 0) {
+      output.parts = [...output.parts, textPart(extra.join("\n"))];
     }
   }
 
@@ -108,12 +120,15 @@ export class AttachmentInjector {
     const materialized = this.materialize(part, key);
     const evidence = await this.analyze(materialized.source, key);
     if (evidence) {
+      const record = evidence.text
+        ? evidence
+        : { ...evidence, warn: (evidence.warn ?? "No textual evidence could be produced for this image.") };
       if (this.cache.size >= this.maxCache) {
         const oldest = this.cache.keys().next().value;
         if (oldest !== undefined) this.cache.delete(oldest);
       }
-      this.cache.set(key, evidence);
-      return evidence;
+      this.cache.set(key, record);
+      return record;
     }
     return undefined;
   }
@@ -182,7 +197,13 @@ export class AttachmentInjector {
       if (process.env.SENSES_DEBUG === "1") {
         process.stderr.write(`[senses] auto-inject failed (${key}): ${(err as Error).message}\n`);
       }
-      return undefined;
+      const msg = (err as Error)?.message ?? String(err);
+      return {
+        text: "",
+        warn: `Automatic vision analysis could not run right now: ${msg}. ` +
+          "The image is materialized to a path below — use senses.inspect(path=...) to analyze it manually.",
+        at: Date.now(),
+      };
     }
   }
 }
