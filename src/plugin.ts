@@ -3,7 +3,7 @@ import type { SensesMessage } from "./runtime/client.js";
 import { RuntimeClient } from "./runtime/client.js";
 import { PhotonProvider } from "./providers/photon.js";
 import { sensesTools } from "./opencode/tools.js";
-import { AttachmentInjector } from "./opencode/attachments.js";
+import { AttachmentInjector, isImagePart } from "./opencode/attachments.js";
 
 export const SensesPlugin: Plugin = async (input, options) => {
   const opts: {
@@ -34,6 +34,22 @@ export const SensesPlugin: Plugin = async (input, options) => {
   const tools = sensesTools(getProvider);
 
   return {
+    event: async ({ event }) => {
+      // Analyze a clipboard/file image as soon as it's attached to a draft —
+      // before the message is submitted — so `chat.message` completes fast and
+      // the model never sees a blind image part.
+      if (event.type !== "message.part.updated") return;
+      if (opts.autoInspect === false) return;
+      const part = (event.properties as { part?: unknown })?.part;
+      if (!isImagePart(part as never)) return;
+      try {
+        await injector.preload(part as never);
+      } catch (err) {
+        if (process.env.SENSES_DEBUG === "1") {
+          process.stderr.write(`[senses] preload failed: ${(err as Error).message}\n`);
+        }
+      }
+    },
     "chat.message": async (msgInput, msgOutput) => {
       if (opts.autoInspect === false) return;
       await injector.handle(msgInput, msgOutput);

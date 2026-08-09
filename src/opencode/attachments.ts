@@ -6,6 +6,7 @@ import type { Part, FilePart, UserMessage } from "@opencode-ai/sdk";
 import type { PhotonProvider } from "../providers/photon.js";
 import type { ImageSource } from "../providers/types.js";
 import contextBuilder from "../core/context-builder.js";
+import { SensesError } from "../runtime/client.js";
 
 interface ChatMessageInput {
   sessionID: string;
@@ -38,6 +39,7 @@ interface InjectedEvidence {
 export class AttachmentInjector {
   private readonly provider: () => PhotonProvider;
   private readonly cache = new Map<string, InjectedEvidence>();
+  private readonly inflight = new Map<string, Promise<InjectedEvidence | undefined>>();
   private readonly maxCache = 32;
 
   constructor(provider: () => PhotonProvider) {
@@ -51,21 +53,10 @@ export class AttachmentInjector {
     const blocks: string[] = [];
     const notes: string[] = [];
     for (const img of images) {
-      const key = this.keyFor(img);
-      let cached = this.cache.get(key);
-      if (!cached) {
-        const materialized = this.materialize(img, key);
-        cached = await this.analyze(materialized.source, key);
-        if (cached) {
-          if (this.cache.size >= this.maxCache) {
-            const oldest = this.cache.keys().next().value;
-            if (oldest !== undefined) this.cache.delete(oldest);
-          }
-          this.cache.set(key, cached);
-        }
-        if (materialized.path) notes.push(materialized.path);
-      }
-      if (cached) blocks.push(cached.text);
+      const cached = await this.readiness(img);
+      if (cached?.text) blocks.push(cached.text);
+      const materialized = this.materialize(img, this.keyFor(img));
+      if (materialized.path) notes.push(materialized.path);
     }
 
     if (blocks.length > 0) {
@@ -81,6 +72,50 @@ export class AttachmentInjector {
         ),
       ];
     }
+  }
+
+  /**
+   * Kick off analysis for an image part (e.g. clipboard paste) as soon as it
+   * exists, without waiting for the message to be submitted. Returns the
+   * cached evidence (if already resolved) for early injection.
+   */
+  async preload(part: FilePart): Promise<InjectedEvidence | undefined> {
+    return this.readiness(part);
+  }
+
+  /** Cache-backed analyze: warm the entry if missing, then return it. */
+  private async readiness(part: FilePart): Promise<InjectedEvidence | undefined> {
+    const key = this.keyFor(part);
+    const cached = this.cache.get(key);
+    if (cached) return cached;
+
+    // Deduplicate concurrent analysis of the same image (the paste fires many
+    // message.part.updated events; only the first should hit the GPU).
+    const inFlight = this.inflight.get(key);
+    if (inFlight) return inFlight;
+
+    const pending = this.analyzePart(part, key).finally(() => {
+      this.inflight.delete(key);
+    });
+    this.inflight.set(key, pending);
+    return pending;
+  }
+
+  private async analyzePart(
+    part: FilePart,
+    key: string,
+  ): Promise<InjectedEvidence | undefined> {
+    const materialized = this.materialize(part, key);
+    const evidence = await this.analyze(materialized.source, key);
+    if (evidence) {
+      if (this.cache.size >= this.maxCache) {
+        const oldest = this.cache.keys().next().value;
+        if (oldest !== undefined) this.cache.delete(oldest);
+      }
+      this.cache.set(key, evidence);
+      return evidence;
+    }
+    return undefined;
   }
 
   private keyFor(part: FilePart): string {
@@ -157,6 +192,10 @@ function isImageFilePart(part: Part): part is FilePart {
     part.type === "file" &&
     (part.mime.startsWith("image/") || part.mime === "application/pdf")
   );
+}
+
+export function isImagePart(part: Part): part is FilePart {
+  return isImageFilePart(part);
 }
 
 function textPart(text: string): Part {
