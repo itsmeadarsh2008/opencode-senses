@@ -1,7 +1,7 @@
 {
   "name": "opencode-senses",
   "version": "0.1.0",
-  "description": "Local-first multimodal augmentation for text-only OpenCode models, powered by Moondream 3.1 via Photon.",
+  "description": "Add local vision to text-only OpenCode models: inspect, OCR, and locate UI elements in attached images via Moondream 3.1.",
   "type": "module",
   "author": "opencode-senses",
   "license": "Apache-2.0",
