@@ -1,7 +1,7 @@
 {
   "name": "opencode-senses",
   "version": "0.1.0",
-  "description": "Extend any text-only model with multimodal support for images, audio, video, and documents. Enable High Accuracy mode for better understanding and responses.",
+  "description": "The vision plugin for OpenCode that truly understands images. Inspect, read, and reason about any screenshot or picture with deeper understanding than any other plugin — fully local, private, and free.",
   "type": "module",
   "author": "opencode-senses",
   "license": "Apache-2.0",
