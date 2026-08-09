@@ -107,7 +107,7 @@ Plugin options are also supported:
 
 Senses turns a text-only OpenCode model into a multimodal agent. Two mechanisms are at work:
 
-1. **Auto-inject** — the moment you attach an image to a message, Senses analyzes it (structured scene read + caption + exact OCR) and appends the result as a `<SENSES>` text block to the same message, *before* the model runs. The model sees the image's evidence natively — no tool call required.
+1. **Auto-inject** — the moment you attach an image to a message, Senses analyzes it (structured scene read + caption + exact OCR) and appends the result as a `<SENSES>` text block to the same message, *before* the model runs. The model sees the image's evidence natively — no tool call required. Clipboard/pasted images (which OpenCode stores only in its internal DB as data URLs) are materialized to `/tmp/senses-<hash>.<ext>`, and the model is told that path so it can re-inspect the file with `senses.*` tools.
 2. **Tools** — the model can call `senses.*` tools directly to dig deeper: ask a question, locate an object, or re-extract text.
 
 Both mechanisms return the same guarded format:

@@ -1,5 +1,7 @@
-import { statSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join as joinPath, resolve as resolvePath } from "node:path";
 import type { Part, FilePart, UserMessage } from "@opencode-ai/sdk";
 import type { PhotonProvider } from "../providers/photon.js";
 import type { ImageSource } from "../providers/types.js";
@@ -27,9 +29,11 @@ interface InjectedEvidence {
 
 /**
  * Auto-injects Senses evidence (structured scene read + caption + exact OCR)
- * whenever the user attaches an image. Runs lazily, caches per image
- * (path + mtime + size), and never raises: a failure just means no evidence
- * block is injected.
+ * whenever the user attaches an image. Clipboard images arrive as base64 data
+ * URLs inside OpenCode's message store (never written to disk), so this
+ * materializes them to a temp file the coding model can reference, caches
+ * analysis per image (path + mtime + size), and never raises: a failure just
+ * means no evidence block is injected.
  */
 export class AttachmentInjector {
   private readonly provider: () => PhotonProvider;
@@ -45,11 +49,13 @@ export class AttachmentInjector {
     if (images.length === 0) return;
 
     const blocks: string[] = [];
+    const notes: string[] = [];
     for (const img of images) {
       const key = this.keyFor(img);
       let cached = this.cache.get(key);
       if (!cached) {
-        cached = await this.analyze(this.sourceFor(img), key);
+        const materialized = this.materialize(img, key);
+        cached = await this.analyze(materialized.source, key);
         if (cached) {
           if (this.cache.size >= this.maxCache) {
             const oldest = this.cache.keys().next().value;
@@ -57,12 +63,23 @@ export class AttachmentInjector {
           }
           this.cache.set(key, cached);
         }
+        if (materialized.path) notes.push(materialized.path);
       }
       if (cached) blocks.push(cached.text);
     }
 
     if (blocks.length > 0) {
       output.parts = [...output.parts, textPart(blocks.join("\n"))];
+    }
+    if (notes.length > 0 && blocks.length > 0) {
+      output.parts = [
+        ...output.parts,
+        textPart(
+          "\n<SENSES Atlas>\nPasted/clipboard images were materialized to disk so you can inspect them directly:\n" +
+            notes.map((n) => `- ${n}\n`).join("") +
+            "Use senses.inspect / senses.ocr / senses.detect with the path above if you need a closer look.\n</SENSES>\n",
+        ),
+      ];
     }
   }
 
@@ -74,11 +91,39 @@ export class AttachmentInjector {
       .digest("hex");
   }
 
-  private sourceFor(part: FilePart): ImageSource {
+  /** Filesystem path (or undefined for plain file URLs). */
+  private filePath(part: FilePart): string | undefined {
     const url = part.url;
-    return url.startsWith("data:") || url.includes(";base64,")
-      ? { type: "data", data: url }
-      : { type: "path", path: url };
+    if (url.startsWith("data:") || url.includes(";base64,")) return undefined;
+    return url;
+  }
+
+  /**
+   * Clipboard images come as base64 data URLs that never touch disk, so the
+   * coding model (text-only) can't reference them. Write them to the OS temp
+   * dir as `<sha>.png` so tool calls can use a real path.
+   */
+  private materialize(
+    part: FilePart,
+    key: string,
+  ): { source: ImageSource; path?: string } {
+    const existing = this.filePath(part);
+    if (existing) return { source: { type: "path", path: resolvePath(existing) } };
+
+    const b64 = part.url.includes(",") ? part.url.split(",", 2)[1] : part.url;
+    if (!b64) return { source: { type: "data", data: part.url } };
+    const data = Buffer.from(b64, "base64");
+    const ext = mimeExt(part.mime);
+    const file = joinPath(tmpdir(), `senses-${key}.${ext}`);
+    try {
+      writeFileSync(file, data);
+      return { source: { type: "path", path: file }, path: file };
+    } catch (err) {
+      if (process.env.SENSES_DEBUG === "1") {
+        process.stderr.write(`[senses] couldn't materialize paste to ${file}: ${(err as Error).message}\n`);
+      }
+      return { source: { type: "data", data: part.url } };
+    }
   }
 
   private async analyze(
@@ -125,4 +170,18 @@ function statSafe(p: string): { size: number; mtimeMs: number } | undefined {
   } catch {
     return undefined;
   }
+}
+
+const MIME_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/bmp": "bmp",
+  "application/pdf": "pdf",
+};
+
+function mimeExt(mime: string): string {
+  return MIME_EXT[mime] ?? "png";
 }
