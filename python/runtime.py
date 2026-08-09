@@ -23,6 +23,7 @@ Methods
 * unload    -> free the model
 * query     -> visual question answering
 * caption   -> image captioning
+* scene     -> structured deep-read (type, layout, elements, state)
 * detect    -> object detection (bounding boxes)
 * point     -> object pointing (center points)
 * segment   -> object segmentation (SVG path)
@@ -256,6 +257,34 @@ def handle_caption(params: dict) -> dict:
     return {"result": {"type": "caption", "caption": res.get("caption")}}
 
 
+SCENE_PROMPT = (
+    "Study this image closely and describe what is actually shown. "
+    "Answer in this exact structure:\n"
+    "type: one of UI screenshot, terminal, code, error dialog, document, chart/diagram, photo, or other\n"
+    "layout: the visual layout in a sentence or two, including where the main regions are.\n"
+    "elements: bullet list the notable visible elements with a short descriptor each "
+    "(e.g. navigation bar top-left, green Submit button bottom-right, empty state graphic, table column 'Total').\n"
+    "state: anything notable about the current state, e.g. warnings, errors, loading, disabled controls, selected item.\n"
+    "For code or text-heavy images, summarize what the code or document is about in one sentence; "
+    "do not try to repeat the text verbatim (OCR covers that). Speak plainly and only about what is observable."
+)
+
+
+def handle_scene(params: dict) -> dict:
+    image = _resolve_image(params["source"])
+    model = _ensure_model(params.get("model"))
+    kwargs: dict = {}
+    if _supports("reason") and params.get("reasoning"):
+        kwargs["reasoning"] = True
+    res = _timed(
+        model.query,
+        image,
+        question=SCENE_PROMPT,
+        **kwargs,
+    )
+    return {"result": {"type": "scene", "scene": res.get("answer")}}
+
+
 def _normalize_detect_objects(objects: list) -> list[dict]:
     out = []
     for obj in objects:
@@ -374,6 +403,7 @@ METHODS: Dict[str, Any] = {
     "unload": handle_unload,
     "query": handle_query,
     "caption": handle_caption,
+    "scene": handle_scene,
     "detect": handle_detect,
     "point": handle_point,
     "segment": handle_segment,

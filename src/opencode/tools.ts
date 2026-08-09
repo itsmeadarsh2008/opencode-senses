@@ -30,7 +30,7 @@ export function sensesTools(provider: () => PhotonProvider) {
   return {
     "senses.inspect": tool({
       description:
-        "Inspect an image with the Senses vision model (Moondream 3.1). Use for screenshots, attached media, or design mockups. If 'question' is given, answers it; otherwise returns a caption plus exact OCR of any visible text. Returns structured evidence in <SENSES> tags.",
+        "Inspect an image with the Senses vision model. Use for screenshots, attached media, or design mockups. If 'question' is given, answers it; otherwise returns a structured scene read (image type, layout, elements, state) plus a caption and exact OCR of any visible text. Returns structured evidence in <SENSES> tags.",
       args: {
         path: tool.schema.string().optional().describe("Path to the image file, relative to the current project."),
         image: tool.schema.string().optional().describe("Image as a base64 data URL (data:image/...;base64,...)."),
@@ -44,11 +44,13 @@ export function sensesTools(provider: () => PhotonProvider) {
             const res = await provider().query({ source: src, question: args.question });
             return contextBuilder.renderQuery(res, { source: label, question: args.question });
           }
-          const [cap, ocr] = await Promise.all([
+          const [cap, scene, ocr] = await Promise.all([
             provider().caption({ source: src }),
+            provider().scene({ source: src }),
             provider().ocr({ source: src }),
           ]);
           return [
+            contextBuilder.renderScene(scene, { source: label }),
             contextBuilder.renderCaption(cap, { source: label }),
             contextBuilder.renderOCR(ocr, { source: label }),
           ].join("\n");

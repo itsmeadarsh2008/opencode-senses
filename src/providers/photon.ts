@@ -14,6 +14,8 @@ import type {
   PointResult,
   QueryRequest,
   QueryResult,
+  SceneRequest,
+  SceneResult,
   SegmentRequest,
   SegmentResult,
   VisionHealth,
@@ -138,6 +140,17 @@ export class PhotonProvider implements VisionProvider {
       throw new SensesError("handler.no_result", "caption returned no text", true);
     }
     return { caption: res["caption"] };
+  }
+
+  async scene(request: SceneRequest): Promise<SceneResult> {
+    const res = (await this.client.request("scene", {
+      source: this.toSource(request.source),
+      reasoning: request.reasoning ?? false,
+    })) as { scene?: string };
+    if (typeof res["scene"] !== "string" || res["scene"].trim() === "") {
+      throw new SensesError("handler.no_result", "scene analysis returned no text", true);
+    }
+    return { scene: res["scene"] };
   }
 
   async segment(request: SegmentRequest): Promise<SegmentResult> {

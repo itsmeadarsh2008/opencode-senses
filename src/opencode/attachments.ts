@@ -26,9 +26,10 @@ interface InjectedEvidence {
 }
 
 /**
- * Auto-injects Senses evidence (caption + exact OCR) whenever the user
- * attaches an image. Runs lazily, caches per image (path + mtime + size),
- * and never raises: a failure just means no evidence block is injected.
+ * Auto-injects Senses evidence (structured scene read + caption + exact OCR)
+ * whenever the user attaches an image. Runs lazily, caches per image
+ * (path + mtime + size), and never raises: a failure just means no evidence
+ * block is injected.
  */
 export class AttachmentInjector {
   private readonly provider: () => PhotonProvider;
@@ -85,12 +86,14 @@ export class AttachmentInjector {
     key: string,
   ): Promise<InjectedEvidence | undefined> {
     try {
-      const [cap, ocr] = await Promise.all([
+      const [cap, scene, ocr] = await Promise.all([
         this.provider().caption({ source }),
+        this.provider().scene({ source }),
         this.provider().ocr({ source }),
       ]);
       const label = source.type === "path" ? source.path : "inline-image";
       const text = [
+        contextBuilder.renderScene(scene, { source: label }),
         contextBuilder.renderCaption(cap, { source: label }),
         contextBuilder.renderOCR(ocr, { source: label }),
       ].join("\n");

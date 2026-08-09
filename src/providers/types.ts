@@ -93,6 +93,11 @@ export interface CaptionRequest {
   length?: "short" | "normal" | "long";
 }
 
+export interface SceneRequest {
+  source: ImageSource;
+  reasoning?: boolean;
+}
+
 export interface SegmentRequest {
   source: ImageSource;
   target: string;
@@ -117,6 +122,10 @@ export interface OCRResult {
 
 export interface CaptionResult {
   caption: string;
+}
+
+export interface SceneResult {
+  scene: string;
 }
 
 export interface SegmentResult {
@@ -153,6 +162,7 @@ export interface VisionProvider {
   point(request: PointRequest): Promise<PointResult>;
   ocr(request: OCRRequest): Promise<OCRResult>;
   caption(request: CaptionRequest): Promise<CaptionResult>;
+  scene(request: SceneRequest): Promise<SceneResult>;
   segment(request: SegmentRequest): Promise<SegmentResult>;
 }
 

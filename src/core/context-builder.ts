@@ -4,6 +4,7 @@ import type {
   OCRResult,
   PointResult,
   QueryResult,
+  SceneResult,
   SegmentResult,
   VisionHealth,
 } from "../providers/types.js";
@@ -63,6 +64,13 @@ export class ContextBuilder {  renderHealth(health: VisionHealth): string {
     return this.wrap(
       `[CAPTION] source: ${opts.source}\ncaption: ${result.caption}`,
       opts.title ?? "Caption",
+    );
+  }
+
+  renderScene(result: SceneResult, opts: RenderingOptions): string {
+    return this.wrap(
+      `[SCENE] source: ${opts.source}\n${result.scene.trim()}`,
+      opts.title ?? "Scene",
     );
   }
 
