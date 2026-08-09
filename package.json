@@ -1,7 +1,7 @@
 {
   "name": "opencode-senses",
   "version": "0.1.0",
-  "description": "Give your text-only AI eyes. A local-first vision plugin that lets any OpenCode model see, read, and understand images, screenshots, and UI — running entirely on your own machine, with no cloud and no data leaving your computer.",
+  "description": "Extend any text-only model with multimodal support for images, audio, video, and documents. Enable High Accuracy mode for better understanding and responses.",
   "type": "module",
   "author": "opencode-senses",
   "license": "Apache-2.0",
