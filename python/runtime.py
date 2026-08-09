@@ -46,6 +46,19 @@ from typing import Any, Dict
 
 from PIL import Image
 
+# Silence benign third-party chatter (HF-token hints, API-key notes) unless
+# the user explicitly asked for debug logs via SENSES_DEBUG=1.
+if os.environ.get("SENSES_DEBUG") != "1":
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    import logging
+    import warnings
+
+    warnings.filterwarnings("ignore")
+    for _name in ("huggingface_hub", "transformers", "moondream.photLib", "moondream"):
+        logging.getLogger(_name).setLevel(logging.ERROR)
+
 MODEL_STATE: Dict[str, Any] = {
     "model": None,
     "model_id": None,

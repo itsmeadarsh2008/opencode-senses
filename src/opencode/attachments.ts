@@ -99,7 +99,9 @@ export class AttachmentInjector {
       ].join("\n");
       return { text, at: Date.now() };
     } catch (err) {
-      process.stderr.write(`[senses] auto-inject failed (${key}): ${(err as Error).message}\n`);
+      if (process.env.SENSES_DEBUG === "1") {
+        process.stderr.write(`[senses] auto-inject failed (${key}): ${(err as Error).message}\n`);
+      }
       return undefined;
     }
   }

@@ -28,6 +28,18 @@ export interface RpcResponse {
   error?: { code: string; message: string };
 }
 
+export type SensesMessage = {
+  title?: string;
+  message: string;
+  variant: "info" | "success" | "warning" | "error";
+};
+
+/** Debug logging: only shown when SENSES_DEBUG=1. */
+function log(...args: unknown[]): void {
+  if (process.env.SENSES_DEBUG !== "1") return;
+  process.stderr.write(`[senses:py] ${args.map(String).join(" ")}\n`);
+}
+
 interface PendingEntry {
   resolve: (v: RpcResponse) => void;
   reject: (e: Error) => void;
@@ -52,15 +64,31 @@ export class RuntimeClient {
   private readonly pending = new Map<number, PendingEntry>();
   private broken = false;
   private readonly uv: string = process.env.SENSES_UV ?? "uv";
+  private readonly notify: (m: SensesMessage) => void;
 
-  constructor(opts: { pythonPath?: string; timeoutMs?: number } = {}) {
+  constructor(
+    opts: {
+      pythonPath?: string;
+      timeoutMs?: number;
+      notify?: (m: SensesMessage) => void;
+    } = {},
+  ) {
     this.pythonPath =
       opts.pythonPath ??
       process.env.SENSES_PYTHON ??
       this.resolvePython();
     this.timeoutMs = opts.timeoutMs ?? 120_000;
+    this.notify = opts.notify ?? (() => {});
 
     this.ready = this.spawn();
+  }
+
+  private message(m: SensesMessage): void {
+    try {
+      this.notify(m);
+    } catch {
+      // never let a notification failure break the runtime
+    }
   }
 
   /**
@@ -71,7 +99,7 @@ export class RuntimeClient {
    */
   private async ensurePython(): Promise<string> {
     const current = this.pythonPath;
-    process.stderr.write(`[senses:py] resolvePython() = '${current}'\n`);
+    log(`resolvePython() = '${current}'`);
 
     // 1. Explicit interpreter: trust it, don't touch.
     if (process.env.SENSES_PYTHON) return current;
@@ -92,10 +120,15 @@ export class RuntimeClient {
       process.env.SENSES_VENV_DIR ?? resolvePath(homedir(), ".cache", "opencode-senses", "venv"),
     );
     const python = venvPython(venv);
-    process.stderr.write(`[senses:py] probe venv '${python}'\n`);
+    log(`probe venv '${python}'`);
     if (await this.hasMoondream(python)) return python;
 
-    process.stderr.write(`[senses:py] provisioning moondream runtime into ${venv} (one-time)\n`);
+    log(`provisioning moondream runtime into ${venv} (one-time)`);
+    this.message({
+      title: "Senses",
+      message: "Installing the vision runtime (first run, one-time).",
+      variant: "info",
+    });
     await mkdirAsync(venv, { recursive: true });
 
     const base = process.env.PYTHON ?? "python3";
@@ -151,6 +184,11 @@ export class RuntimeClient {
       );
     }
     this.pythonPath = python;
+    this.message({
+      title: "Senses",
+      message: "Vision runtime installed and ready.",
+      variant: "success",
+    });
     return python;
   }
 
@@ -184,11 +222,11 @@ export class RuntimeClient {
     args: string[],
     label: string,
   ): Promise<void> {
-    process.stderr.write(`[senses:py] ${label}...\n`);
+    log(`${label}...`);
     await new Promise<void>((resolve, reject) => {
       const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
-      child.stdout.on("data", (d) => process.stderr.write(`[senses:py]   ${d}`));
-      child.stderr.on("data", (d) => process.stderr.write(`[senses:py]   ${d}`));
+      child.stdout.on("data", (d) => log(`  ${d}`));
+      child.stderr.on("data", (d) => log(`  ${d}`));
       child.on("error", reject);
       child.on("exit", (code) =>
         code === 0 ? resolve() : reject(new Error(`${label} failed (exit ${code})`)),
@@ -246,12 +284,17 @@ export class RuntimeClient {
       pythonPath = await this.ensurePython();
     } catch (err) {
       this.broken = true;
-      process.stderr.write(`[senses:py] ${(err as Error).message}\n`);
+      log(`provision failed: ${(err as Error).message}`);
+      this.message({
+        title: "Senses failed to start",
+        message: (err as Error).message,
+        variant: "error",
+      });
       this.rejectAll(err instanceof Error ? err : new Error(String(err)));
       return;
     }
     const runtimeScript = resolvePath(this.repoRoot(), "python", "runtime.py");
-    process.stderr.write(`[senses:py] spawning '${pythonPath}' runtime.py='${runtimeScript}'\n`);
+    log(`spawning '${pythonPath}' runtime.py='${runtimeScript}'`);
     const child = spawn(pythonPath, [runtimeScript], {
       stdio: ["pipe", "pipe", "pipe"],
       env: process.env,
@@ -261,8 +304,7 @@ export class RuntimeClient {
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => this.onData(chunk));
     child.stderr.on("data", (chunk: Buffer) => {
-      // forward for diagnostics; RFC3339-ish prefix keeps logs greppable
-      process.stderr.write(`[senses:py] ${chunk.toString()}`);
+      log(chunk.toString());
     });
     child.on("error", (err) => this.onProcessError(err));
     child.on("exit", (code, signal) => this.onExit(code, signal));
@@ -277,15 +319,15 @@ export class RuntimeClient {
         new Promise((resolve) => setTimeout(resolve, 15_000)),
       ]);
     } catch (err) {
-      process.stderr.write(`[senses:py] startup ping failed: ${(err as Error).message}\n`);
+      log(`startup ping failed: ${(err as Error).message}`);
     }
     if (this.child && !this.broken && pingOK) {
-      process.stderr.write("[senses:py] runtime ready\n");
+      log("runtime ready");
     }
   }
 
   private onProcessError(err: Error): void {
-    process.stderr.write(`[senses:py] process error: ${err.message}\n`);
+    log(`process error: ${err.message}`);
     this.broken = true;
     this.rejectAll(new Error(`python runtime failed: ${err.message}`));
   }
@@ -297,9 +339,7 @@ export class RuntimeClient {
     this.rejectAll(new Error(`python runtime exited (code=${code}, signal=${signal})`));
     this.child = null;
     if (!expected) {
-      process.stderr.write(
-        `[senses:py] runtime exited unexpectedly (code=${code}, signal=${signal})\n`,
-      );
+      log(`runtime exited unexpectedly (code=${code}, signal=${signal})`);
     }
   }
 
@@ -319,7 +359,7 @@ export class RuntimeClient {
     try {
       msg = JSON.parse(line) as RpcResponse;
     } catch {
-      process.stderr.write(`[senses:py] bad JSON from runtime: ${line}\n`);
+      log(`bad JSON from runtime: ${line}`);
       return;
     }
     const entry = this.pending.get(msg.id);

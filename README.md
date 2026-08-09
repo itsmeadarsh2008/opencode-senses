@@ -217,6 +217,9 @@ Everything is optional. Set as environment variables or plugin options:
 | `SENSES_VENV_DIR` | `~/.cache/opencode-senses/venv` | Where the auto-provisioned venv is created |
 | `SENSES_UV` | `uv` | Binary to use for auto-provisioning when available |
 | `SENSES_DISABLE_AUTO_PROVISION` | — | Set `1` to skip auto-install; then `SENSES_PYTHON` must supply `moondream` |
+| `SENSES_DEBUG` | — | Set `1` to print runtime logs to stderr (model spawn, provisioning output, library warnings). Off by default — useful signals go to TUI toasts instead. |
+| `HF_TOKEN` | — | Hugging Face token. Only for faster download rate-limits on model fetch; not required for the free default model |
+| `MOONDREAM_API_KEY` | — | Only needed for Moondream finetune/hosted inference. Useless for the default local model |
 | `MOONDREAM_API_KEY` | — | Only needed for fine-tuned models. |
 | `HF_HOME` | `~/.cache/huggingface` | Where model weights are cached. |
 
