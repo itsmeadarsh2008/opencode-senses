@@ -61,17 +61,20 @@ export class AttachmentInjector {
       const key = this.keyFor(img);
       let record = this.cache.get(key) ?? undefined;
       if (!record) {
-        // Start (or join) analysis in the background; expect preload to have
-        // run already at paste time. Never await it here.
-        void this.readiness(img).then((r) => {
-          if (r) {
-            this.cache.set(key, r);
-            if (this.cache.size >= this.maxCache) {
-              const oldest = this.cache.keys().next().value;
-              if (oldest !== undefined) this.cache.delete(oldest);
-            }
+        // The paste-time preload (`event` hook) usually has analysis in flight
+        // by the time the user submits. Give it a short bounded grace period so
+        // fast submitters still get real evidence; never await the full GPU run.
+        record = await Promise.race([
+          this.readiness(img),
+          new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 2_000)),
+        ]);
+        if (record) {
+          this.cache.set(key, record);
+          if (this.cache.size >= this.maxCache) {
+            const oldest = this.cache.keys().next().value;
+            if (oldest !== undefined) this.cache.delete(oldest);
           }
-        });
+        }
       }
       if (record?.text) blocks.push(record.text);
       if (record?.warn) warnings.push(record.warn);
