@@ -28,7 +28,7 @@ function fail(err: unknown): string {
 
 export function sensesTools(provider: () => PhotonProvider) {
   return {
-    "senses.inspect": tool({
+    "senses_inspect": tool({
       description:
         "Inspect an image with the Senses vision model. Use for screenshots, attached media, or design mockups. If 'question' is given, answers it; otherwise returns a structured scene read (image type, layout, elements, state) plus a caption and exact OCR of any visible text. Returns structured evidence in <SENSES> tags.",
       args: {
@@ -60,7 +60,7 @@ export function sensesTools(provider: () => PhotonProvider) {
       },
     }),
 
-    "senses.detect": tool({
+    "senses_detect": tool({
       description:
         "Detect objects or UI elements in an image and return their labeled bounding boxes (e.g. 'submit button', 'navbar', 'broken element').",
       args: {
@@ -82,7 +82,7 @@ export function sensesTools(provider: () => PhotonProvider) {
       },
     }),
 
-    "senses.point": tool({
+    "senses_point": tool({
       description:
         "Locate the exact on-screen position of a target in an image. Returns normalized point coordinates (0-1) identifying where the target sits.",
       args: {
@@ -101,7 +101,7 @@ export function sensesTools(provider: () => PhotonProvider) {
       },
     }),
 
-    "senses.ocr": tool({
+    "senses_ocr": tool({
       description:
         "Extract exact text from an image. Prefer this over a caption when the precise wording of an error message, code, label, or page text matters.",
       args: {
@@ -124,7 +124,7 @@ export function sensesTools(provider: () => PhotonProvider) {
       },
     }),
 
-    "senses.status": tool({
+    "senses_status": tool({
       description:
         "Report the Senses vision runtime status: model load state, device, VRAM usage, request count, last inference time.",
       args: {},

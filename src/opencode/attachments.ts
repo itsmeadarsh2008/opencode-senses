@@ -90,7 +90,7 @@ export class AttachmentInjector {
       extra.push(
         "\n<SENSES Atlas>\nPasted/clipboard images were materialized to disk so you can inspect them directly:\n" +
           notes.map((n) => `- ${n}\n`).join("") +
-          "Use senses.inspect / senses.ocr / senses.detect with the path above if you need a closer look.\n</SENSES>\n",
+          "Use senses_inspect / senses_ocr / senses_detect with the path above if you need a closer look.\n</SENSES>\n",
       );
     }
     if (warnings.length > 0) {
@@ -228,7 +228,7 @@ export class AttachmentInjector {
       return {
         text: "",
         warn: `Automatic vision analysis could not run right now: ${msg}. ` +
-          "The image is materialized to a path below — use senses.inspect(path=...) to analyze it manually.",
+          "The image is materialized to a path below — use senses_inspect(path=...) to analyze it manually.",
         at: Date.now(),
       };
     }

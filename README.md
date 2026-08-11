@@ -13,7 +13,7 @@ OpenCode (text-only model)
       │
 OpenCode Senses Plugin  ──stdio JSON-RPC──►  Python Runtime
       │                                          │
-      │   senses.inspect / ocr / detect /        │  Moondream 2 via Photon/kestrel
+      │   senses_inspect / ocr / detect /        │  Moondream 2 via Photon/kestrel
       │   point / status + auto-inject on        │  (local GPU inference)
       │   image attachments                      │
       ▼                                          ▼
@@ -146,26 +146,26 @@ All tools accept either `path` (a file path relative to the current project) or 
 
 | Tool | Args | Notes |
 |---|---|---|
-| **`senses.inspect`** | `path` / `image`, optional `question` | No `question`: returns a structured scene read (type, layout, elements, state) plus a caption and exact OCR of all visible text. With `question`: answers it visually (e.g. *"What's the URL in this screenshot?"*). This is the workhorse. |
-| **`senses.ocr`** | `path` / `image`, `kind` | Extracts *exact* text, preserving line breaks. `kind: all` (default), `code` (only code), `error` (only error messages/red banners). Use when wording must be exactly right. |
-| **`senses.detect`** | `path` / `image`, `target` | Finds objects/UI elements that match `target` and returns normalized `[0,1]` bounding boxes (`x1,y1,x2,y2`). Example: `senses.detect(screenshot.png, "search button")`. |
-| **`senses.point`** | `path` / `image`, `target` | Locates the (normalized) center point of a target. For "click here" coordinates. |
-| **`senses.status`** | — | Shows model load state, device, VRAM, request count, last inference time. |
+| **`senses_inspect`** | `path` / `image`, optional `question` | No `question`: returns a structured scene read (type, layout, elements, state) plus a caption and exact OCR of all visible text. With `question`: answers it visually (e.g. *"What's the URL in this screenshot?"*). This is the workhorse. |
+| **`senses_ocr`** | `path` / `image`, `kind` | Extracts *exact* text, preserving line breaks. `kind: all` (default), `code` (only code), `error` (only error messages/red banners). Use when wording must be exactly right. |
+| **`senses_detect`** | `path` / `image`, `target` | Finds objects/UI elements that match `target` and returns normalized `[0,1]` bounding boxes (`x1,y1,x2,y2`). Example: `senses_detect(screenshot.png, "search button")`. |
+| **`senses_point`** | `path` / `image`, `target` | Locates the (normalized) center point of a target. For "click here" coordinates. |
+| **`senses_status`** | — | Shows model load state, device, VRAM, request count, last inference time. |
 
 Segmentation exists in the runtime but is not exposed as a tool on the default Moondream 2 model (it needs Moondream 3.x).
 
-#### Example: `senses.inspect` (no question)
+#### Example: `senses_inspect` (no question)
 
 ```
 > "Here's the screenshot. Let me look at it."
 (plugin auto-injects the scene+caption+OCR evidence block before the model responds)
 ```
 
-#### Example: `senses.ocr` called by the model
+#### Example: `senses_ocr` called by the model
 
 ```
 > "What does this error say?"
-model → calls senses.ocr(path="error.png", kind="error")
+model → calls senses_ocr(path="error.png", kind="error")
 <SENSES OCR>
 [OCR] source: error.png
 text:
@@ -175,12 +175,12 @@ Login failed
 </SENSES>
 ```
 
-#### Example: `senses.detect` feeding screenshot-to-code
+#### Example: `senses_detect` feeding screenshot-to-code
 
 ```
 > "Build this mockup from ui.png"
-  senses.detect(ui.png, "search input")    → bbox=[0.12,0.08,0.53,0.13]
-  senses.detect(ui.png, "submit button")   → bbox=[0.73,0.28,0.88,0.35]
+  senses_detect(ui.png, "search input")    → bbox=[0.12,0.08,0.53,0.13]
+  senses_detect(ui.png, "submit button")   → bbox=[0.73,0.28,0.88,0.35]
   → model implements with grounded position constraints
 ```
 
@@ -188,9 +188,9 @@ Login failed
 
 **Debug a broken screen.** Attach the screenshot and ask *"Why does this page look wrong?"*. Senses supplies the layout, visible text and any error message as grounded evidence.
 
-**Extract exact messages.** "What does this say?" — noise-free, verbatim text via `senses.ocr(kind="error" | "code")`.
+**Extract exact messages.** "What does this say?" — noise-free, verbatim text via `senses_ocr(kind="error" | "code")`.
 
-**Screenshot → code.** Feed a design mockup to a coding session; `senses.detect` gives normalized positions to anchor the markup/HTML.
+**Screenshot → code.** Feed a design mockup to a coding session; `senses_detect` gives normalized positions to anchor the markup/HTML.
 
 **Continuous vision on the CLI.** Text-only TUI keeps your context small — sight is in a separate process. No attached bytes bloat the transcript.
 

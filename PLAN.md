@@ -1105,36 +1105,36 @@ The user SHOULD NOT need to manually invoke Senses for ordinary multimodal reque
 
 Senses SHOULD expose:
 
-## `senses.inspect`
+## `senses_inspect`
 
 General perception.
 
 ```text
-senses.inspect(source, task)
+senses_inspect(source, task)
 ```
 
-## `senses.detect`
+## `senses_detect`
 
 Find objects/UI elements.
 
 ```text
-senses.detect(source, target)
+senses_detect(source, target)
 ```
 
-## `senses.point`
+## `senses_point`
 
 Find a specific point.
 
 ```text
-senses.point(source, target)
+senses_point(source, target)
 ```
 
-## `senses.ocr`
+## `senses_ocr`
 
 Extract exact text.
 
 ```text
-senses.ocr(source)
+senses_ocr(source)
 ```
 
 ## `senses.evidence`
@@ -1145,12 +1145,12 @@ Retrieve supporting evidence.
 senses.evidence(query)
 ```
 
-## `senses.status`
+## `senses_status`
 
 Runtime information.
 
 ```text
-senses.status()
+senses_status()
 ```
 
 ---
@@ -1541,7 +1541,7 @@ Senses SHOULD attempt:
 
 # 49. Observability
 
-`senses.status` SHOULD expose:
+`senses_status` SHOULD expose:
 
 ```text
 Provider:
@@ -1814,8 +1814,8 @@ Implement:
 * Evidence objects
 * Context Builder
 * automatic context injection
-* `senses.inspect`
-* `senses.status`
+* `senses_inspect`
+* `senses_status`
 * caching
 * GPU resource management
 

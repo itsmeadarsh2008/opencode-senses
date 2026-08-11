@@ -1,0 +1,390 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  background: #2a3439;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============ Phone frame ============ */
+
+.phone {
+  position: relative;
+  width: min(430px, 100vw);
+  aspect-ratio: 893 / 1343;
+  overflow: hidden;
+  background: #091413;
+  border-radius: 12px;
+  box-shadow:
+    0 60px 120px rgba(0, 0, 0, 0.7),
+    0 24px 48px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ============ Wallpaper (portrait, slowly breathing) ============ */
+
+.wallpaper {
+  position: absolute;
+  inset: -6%;
+  will-change: transform;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wallpaper-inner {
+  position: absolute;
+  inset: -6%;
+  background: url("wallpaper.jpg") center / cover no-repeat;
+  filter: saturate(1.25) contrast(1.04) brightness(0.96);
+  animation: breathe 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes breathe {
+  from { transform: scale(1.02) translateY(-0.6%); }
+  to   { transform: scale(1.09) translateY(0.8%); }
+}
+
+/* ============ Status bar ============ */
+
+.status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 24px 0;
+  z-index: 10;
+  pointer-events: none;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+.time {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.status-icons svg {
+  height: 13px;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+}
+
+.status-icons svg:first-child {
+  height: 11px;
+}
+
+/* ============ Liquid Glass card ============ */
+
+.glass-card {
+  position: absolute;
+  top: 11.5%;
+  left: 24px;
+  right: 24px;
+  padding: 14px;
+  border-radius: 34px;
+  border: none;
+  background:
+    radial-gradient(130% 100% at var(--mx, 30%) var(--my, 0%), rgba(170, 220, 255, 0.22), transparent 62%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(160, 215, 255, 0.28),
+    inset 2px 0 10px -6px rgba(255, 255, 255, 0.6),
+    inset -2px 0 10px -6px rgba(170, 220, 255, 0.5),
+    inset 0 0 26px rgba(140, 200, 255, 0.12),
+    0 0 44px rgba(180, 220, 255, 0.22),
+    0 30px 70px rgba(6, 10, 32, 0.42);
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-radius 6s ease-in-out;
+  animation: membrane 9s ease-in-out infinite;
+  z-index: 5;
+  overflow: hidden;
+}
+
+@keyframes membrane {
+  0%, 100% { border-radius: 34px 36px 34px 35px; }
+  33%      { border-radius: 36px 33px 37px 33px; }
+  66%      { border-radius: 33px 36px 33px 37px; }
+}
+
+/* animated caustic light pattern */
+.caustics {
+  position: absolute;
+  inset: -30%;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="420" height="420"><defs><filter id="f"><feGaussianBlur stdDeviation="16"/></filter></defs><g filter="url(%23f)" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="9"><ellipse cx="70" cy="140" rx="42" ry="13" transform="rotate(-14 70 140)"/><ellipse cx="150" cy="90" rx="50" ry="12" transform="rotate(20 150 90)"/><ellipse cx="230" cy="190" rx="56" ry="13" transform="rotate(-8 230 190)"/><ellipse cx="320" cy="110" rx="44" ry="12" transform="rotate(24 320 110)"/><ellipse cx="360" cy="260" rx="52" ry="12" transform="rotate(-18 360 260)"/><ellipse cx="120" cy="300" rx="55" ry="12" transform="rotate(12 120 300)"/><ellipse cx="250" cy="350" rx="48" ry="11" transform="rotate(-24 250 350)"/><ellipse cx="380" cy="360" rx="46" ry="11" transform="rotate(9 380 360)"/></g></svg>') 0 0 / 420px 420px repeat;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: caustic-drift 11s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes caustic-drift {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(210px, 210px); }
+}
+
+/* cool watery blue veil */
+.water-tint {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(150, 220, 255, 0.12), rgba(90, 160, 255, 0.05) 50%, rgba(40, 120, 240, 0.1));
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* internal wave highlights */
+.wave {
+  position: absolute;
+  left: 4%;
+  width: 92%;
+  height: 1.5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  filter: blur(0.6px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.w1 { top: 30%; animation: wave-a 7.5s ease-in-out infinite; }
+.w2 { top: 58%; animation: wave-b 9.5s ease-in-out infinite; }
+
+@keyframes wave-a {
+  0%, 100% { transform: translateX(0) scaleY(1); opacity: 0.35; }
+  50%      { transform: translateX(18px) scaleY(1.8); opacity: 0.7; }
+}
+
+@keyframes wave-b {
+  0%, 100% { transform: translateX(0) scaleY(1.4); opacity: 0.5; }
+  50%      { transform: translateX(-22px) scaleY(1); opacity: 0.8; }
+}
+
+/* ============ Tiles ============ */
+
+.tiles {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  transform: translateZ(30px);
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 118px;
+  border-radius: 28px;
+  border: none;
+  background: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(160, 215, 255, 0.26),
+    inset 1.5px 0 8px -6px rgba(255, 255, 255, 0.6),
+    inset -1.5px 0 8px -6px rgba(170, 220, 255, 0.5),
+    inset 0 0 18px rgba(140, 200, 255, 0.1),
+    0 0 22px rgba(180, 220, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+
+.tile svg {
+  width: 46px;
+  height: 46px;
+  filter: drop-shadow(0 2px 6px rgba(20, 30, 80, 0.25));
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tile:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 rgba(160, 215, 255, 0.32),
+    inset 1.5px 0 8px -6px rgba(255, 255, 255, 0.75),
+    inset -1.5px 0 8px -6px rgba(170, 220, 255, 0.6),
+    inset 0 0 18px rgba(140, 200, 255, 0.14),
+    0 0 30px rgba(180, 220, 255, 0.26),
+    0 14px 34px rgba(10, 20, 60, 0.2);
+}
+
+.tile:hover svg {
+  transform: scale(1.08);
+}
+
+.tile:active {
+  transform: scale(0.94);
+  transition-duration: 0.1s;
+}
+
+/* ============ Promo text ============ */
+
+.promo {
+  position: absolute;
+  left: 36px;
+  right: 36px;
+  bottom: 9.5%;
+  z-index: 5;
+}
+
+.promo h1 {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+.promo p {
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 400;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* ============ Home indicator ============ */
+
+.home-indicator {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 134px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  z-index: 10;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 460px) {
+  .phone {
+    width: 100vw;
+    height: 100dvh;
+    aspect-ratio: auto;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .tile {
+    height: calc(118px * 0.92);
+  }
+}
+
+/* ============ Background toggle ============ */
+
+.bg-toggle {
+  position: absolute;
+  top: 58px;
+  right: 24px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(9, 20, 19, 0.42);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 6px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+
+.bg-toggle svg {
+  width: 20px;
+  height: 20px;
+  position: absolute;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+}
+
+.bg-toggle .flat {
+  opacity: 0;
+  transform: scale(0.4);
+  color: #a7f3e0;
+}
+
+.bg-toggle:hover {
+  transform: scale(1.1);
+}
+
+.bg-toggle:active {
+  transform: scale(0.92);
+}
+
+/* ============ Flat (solid background) mode ============ */
+
+.phone.flat .wallpaper {
+  opacity: 0;
+}
+
+.phone.flat .bg-toggle .flat {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.phone.flat .bg-toggle svg:first-child {
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+.phone.flat .caustics,
+.phone.flat .water-tint,
+.phone.flat .wave,
+.phone.flat .droplet-highlight {
+  opacity: 0;
+}
+
+.phone.flat .glass-card {
+  background:
+    radial-gradient(130% 100% at var(--mx, 30%) var(--my, 0%), rgba(170, 220, 255, 0.16), transparent 62%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(160, 215, 255, 0.28),
+    inset 2px 0 10px -6px rgba(255, 255, 255, 0.6),
+    inset -2px 0 10px -6px rgba(170, 220, 255, 0.5),
+    0 0 44px rgba(180, 220, 255, 0.16),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
+.phone.flat .tile {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(160, 215, 255, 0.24),
+    inset 1.5px 0 8px -6px rgba(255, 255, 255, 0.55),
+    inset -1.5px 0 8px -6px rgba(170, 220, 255, 0.45),
+    0 0 22px rgba(180, 220, 255, 0.14);
+}
