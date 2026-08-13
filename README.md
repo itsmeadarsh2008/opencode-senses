@@ -1,5 +1,64 @@
 # OpenCode Senses
 
+<p align="center">
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- flat near-black background, no gradients -->
+  <rect width="1200" height="630" fill="#111111"/>
+  <rect x="1" y="1" width="1198" height="628" fill="none" stroke="#242424" stroke-width="1"/>
+
+  <!-- corner ticks -->
+  <g stroke="#333333" stroke-width="1.5">
+    <path d="M40 40 H72 M40 40 V72" fill="none"/>
+    <path d="M1160 40 H1128 M1160 40 V72" fill="none"/>
+    <path d="M40 590 H72 M40 590 V558" fill="none"/>
+    <path d="M1160 590 H1128 M1160 590 V558" fill="none"/>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace">
+
+    <!-- kicker -->
+    <circle cx="80" cy="88" r="6" fill="#ef4444"/>
+    <circle cx="80" cy="88" r="10" fill="none" stroke="#ef4444" stroke-opacity="0.35" stroke-width="1.5"/>
+    <text x="102" y="94" font-size="17" letter-spacing="4" fill="#9a9a9a"
+          textLength="260" lengthAdjust="spacingAndGlyphs">OPENCODE PLUGIN</text>
+    <text x="1120" y="94" font-size="17" letter-spacing="2" fill="#5a5a5a" text-anchor="end"
+          textLength="100" lengthAdjust="spacingAndGlyphs">senses_*</text>
+
+    <!-- headline -->
+    <text x="78" y="205" font-size="74" font-weight="700" fill="#ffffff"
+          textLength="660" lengthAdjust="spacingAndGlyphs">OpenCode Senses</text>
+    <text x="80" y="250" font-size="29" fill="#a3a3a3"
+          textLength="600" lengthAdjust="spacingAndGlyphs">vision for text-only coding models</text>
+
+    <!-- accent tagline -->
+    <rect x="80" y="286" width="34" height="3" fill="#ef4444"/>
+    <text x="128" y="296" font-size="18" letter-spacing="3" fill="#ffffff"
+          textLength="420" lengthAdjust="spacingAndGlyphs">FULLY LOCAL &#183; PRIVATE &#183; FREE</text>
+
+    <line x1="80" y1="320" x2="1120" y2="320" stroke="#242424" stroke-width="1"/>
+
+    <!-- simplified body copy, two lines -->
+    <text x="80" y="366" font-size="23" fill="#d6d6d6"
+          textLength="1040" lengthAdjust="spacingAndGlyphs">Attach a screenshot, mockup, or web URL &#8212; and a text-only model sees it.</text>
+    <text x="80" y="404" font-size="23" fill="#d6d6d6"
+          textLength="1040" lengthAdjust="spacingAndGlyphs">Grounded OCR, layout, and 13 senses_* tools, running 100% local on your GPU.</text>
+
+    <!-- humor line -->
+    <text x="80" y="452" font-size="17" font-style="italic" fill="#6b6b6b"
+          textLength="760" lengthAdjust="spacingAndGlyphs">The text model reasons. Senses perceives, grounds, verifies, and fetches snacks.</text>
+
+    <line x1="80" y1="486" x2="1120" y2="486" stroke="#242424" stroke-width="1"/>
+
+    <!-- single quick fact -->
+    <rect x="80" y="508" width="6" height="18" fill="#ef4444"/>
+    <text x="98" y="524" font-size="19" letter-spacing="1" fill="#e5e5e5"
+          textLength="560" lengthAdjust="spacingAndGlyphs">Works extremely fast with very high accuracy</text>
+
+  </g>
+</svg>
+</p>
+
 [![stars](https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=stars&labelColor=111111&color=111111)]()
 [![forks](https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=forks&labelColor=111111&color=111111)]()
 [![issues](https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=issues&labelColor=111111&color=111111)]()
