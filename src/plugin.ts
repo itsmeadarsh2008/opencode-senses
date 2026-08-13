@@ -11,6 +11,8 @@ export const SensesPlugin: Plugin = async (input, options) => {
     autoInspect?: boolean;
     python?: string;
     timeoutMs?: number;
+    fetchTimeoutMs?: number;
+    reverseSearch?: "auto" | "always";
   } = (options ?? {}) as never;
 
   if (opts.enabled === false) {
@@ -27,11 +29,16 @@ export const SensesPlugin: Plugin = async (input, options) => {
       });
     },
   });
-  const providerObj = new PhotonProvider(client, { projectDir: input.directory });
+  const providerObj = new PhotonProvider(client, {
+    projectDir: input.directory,
+    fetchTimeoutMs: opts.fetchTimeoutMs,
+  });
   const getProvider = () => providerObj;
   const injector = new AttachmentInjector(getProvider);
 
-  const tools = sensesTools(getProvider);
+  const tools = sensesTools(getProvider, {
+    reverseSearch: opts.reverseSearch === "always" ? "always" : "auto",
+  });
 
   return {
     event: async ({ event }) => {

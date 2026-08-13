@@ -103,6 +103,120 @@ export interface SegmentRequest {
   target: string;
 }
 
+export interface MetadataRequest {
+  source: ImageSource;
+}
+
+export interface MetadataResult {
+  width: number;
+  height: number;
+  format: string;
+  mode: string;
+  bytes?: number;
+  dpi?: [number, number] | null;
+  exif: Record<string, unknown>;
+}
+
+export interface CropRequest {
+  source: ImageSource;
+  bbox: BBox;
+}
+
+export interface CropResult {
+  path: string;
+  width: number;
+  height: number;
+  bboxPx: [number, number, number, number];
+}
+
+export interface ZoomRequest {
+  source: ImageSource;
+  region?: BBox;
+  scale?: number;
+  analyze?: "none" | "ocr" | "caption" | "query";
+  question?: string;
+}
+
+export interface ZoomResult {
+  path: string;
+  width: number;
+  height: number;
+  scale: number;
+  analysis?: { kind: "ocr" | "caption" | "query"; text: string };
+}
+
+export interface ColorsRequest {
+  source: ImageSource;
+  region?: BBox;
+}
+
+export interface ColorsResult {
+  palette: Array<{ hex: string; share: number }>;
+  buckets: { dark: number; mid: number; bright: number };
+  avgRgb: [number, number, number];
+}
+
+export interface DiffRequest {
+  source: ImageSource;
+  other: ImageSource;
+  describe?: boolean;
+}
+
+export interface DiffResult {
+  changedPct: number;
+  regions: BBox[];
+  width: number;
+  height: number;
+  description?: string;
+}
+
+export interface AnnotateRequest {
+  source: ImageSource;
+  boxes?: Array<BBox & { label?: string }>;
+  points?: Array<{ x: number; y: number; label?: string }>;
+  color?: string;
+  label?: string;
+}
+
+export interface AnnotateResult {
+  path: string;
+  width: number;
+  height: number;
+}
+
+export interface HashSearchRequest {
+  source: ImageSource;
+  dir?: string;
+  recursive?: boolean;
+  limit?: number;
+}
+
+export interface HashSearchResult {
+  matches: Array<{ path: string; hamming: number; similarity: number }>;
+  scanned: number;
+  limit: number;
+}
+
+export interface ReverseSearchRequest {
+  source: ImageSource;
+  providers?: string[];
+  dir?: string;
+  recursive?: boolean;
+  limit?: number;
+}
+
+export interface ReverseSearchResult {
+  query: string;
+  results: Array<
+    | { provider: "local"; matches: Array<{ path: string; similarity: number }>; scanned: number }
+    | {
+        provider: "yandex";
+        searchUrl: string;
+        matches: Array<{ url: string | null; title: string | null }>;
+      }
+  >;
+}
+
 export interface QueryResult {
   answer: string;
   reasoning?: string;
@@ -164,6 +278,14 @@ export interface VisionProvider {
   caption(request: CaptionRequest): Promise<CaptionResult>;
   scene(request: SceneRequest): Promise<SceneResult>;
   segment(request: SegmentRequest): Promise<SegmentResult>;
+  metadata(request: MetadataRequest): Promise<MetadataResult>;
+  crop(request: CropRequest): Promise<CropResult>;
+  zoom(request: ZoomRequest): Promise<ZoomResult>;
+  colors(request: ColorsRequest): Promise<ColorsResult>;
+  diff(request: DiffRequest): Promise<DiffResult>;
+  annotate(request: AnnotateRequest): Promise<AnnotateResult>;
+  hashSearch(request: HashSearchRequest): Promise<HashSearchResult>;
+  reverse(request: ReverseSearchRequest): Promise<ReverseSearchResult>;
 }
 
 export interface VisionHealth {

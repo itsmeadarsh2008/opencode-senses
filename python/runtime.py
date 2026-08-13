@@ -28,20 +28,36 @@ Methods
 * point     -> object pointing (center points)
 * segment   -> object segmentation (SVG path)
 * ocr       -> exact text extraction via visual query
+* metadata  -> dimensions/format/bytes/exif (no model)
+* crop      -> save a normalized bbox region to a PNG file (no model)
+* zoom      -> upscale a region (LANCZOS), optionally re-analyze it
+* colors    -> dominant palette + luminance stats (no model)
+* diff      -> pixel-level change map between two images
+* annotate  -> draw boxes/points onto a copy (no model)
+* hash_search -> local perceptual-hash reverse search (no model)
+* reverse   -> reverse image search: local + Yandex (no API key)
 * shutdown  -> exit(0)
 
 source := {"type": "path", "path": str} | {"type": "data", "data": dataUrl}
+
+path sources may be http(s) URLs; the TypeScript side downloads them
+verbatim into the cache before they reach this runtime.
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import os
+import re
+import secrets
 import sys
 import time
 import traceback
+import urllib.parse
+import urllib.request
 from typing import Any, Dict
 
 from PIL import Image
@@ -76,13 +92,65 @@ DEFAULT_MODEL = "moondream2"
 MOONDREAM3_ONLY_TASKS = {"segment", "reason", "ocr"}
 
 
+def _cache_dir() -> str:
+    base = os.environ.get("SENSES_CACHE_DIR") or os.path.join(
+        os.path.expanduser("~"), ".cache", "opencode-senses"
+    )
+    os.makedirs(base, exist_ok=True)
+    return base
+
+
+def _converted_dir() -> str:
+    d = os.path.join(_cache_dir(), "converted")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _decode_for_analysis(path: str, opened: Image.Image) -> Image.Image:
+    """PIL cannot open all formats (SVG, HEIC). Try optional decoders and keep
+    a PNG analysis copy; the original file is never modified."""
+    try:
+        opened.seek(0)
+        opened.convert("RGB")  # forces a real decode
+        opened.seek(0)
+        return opened
+    except Exception:
+        pass
+    converted = os.path.join(
+        _converted_dir(), f"{hashlib.sha256(path.encode()).hexdigest()[:12]}.png"
+    )
+    try:
+        import cairosvg  # type: ignore
+    except ImportError:
+        cairosvg = None
+    if cairosvg is not None and path.lower().endswith(".svg"):
+        cairosvg.svg2png(url=path, write_to=converted, output_width=2048)
+        return Image.open(converted).convert("RGB")
+    try:
+        pillow_heif = __import__("pillow_heif")  # type: ignore
+    except ImportError:
+        pillow_heif = None
+    if pillow_heif is not None:
+        try:
+            pillow_heif.register_heif_opener()
+            Image.open(path).convert("RGB").save(converted)
+            return Image.open(converted).convert("RGB")
+        except Exception:
+            pass
+    raise ValueError(
+        f"cannot decode image format for '{path}': install optional codecs "
+        "('pip install cairosvg' for SVG, 'pip install pillow-heif' for HEIC) "
+        "or convert the image to PNG/JPEG"
+    )
+
+
 def _resolve_image(source: dict) -> Image.Image:
     kind = source.get("type")
     if kind == "path":
         path = source["path"]
         if not os.path.isfile(path):
             raise FileNotFoundError(f"image file not found: {path}")
-        return Image.open(path)
+        return _decode_for_analysis(path, Image.open(path))
     if kind == "data":
         data = source["data"]
         if "," in data:
@@ -402,6 +470,500 @@ def handle_ocr(params: dict) -> dict:
     return {"result": {"type": "ocr", "text": res.get("answer")}}
 
 
+def _bbox_to_px(bbox: dict, w: int, h: int) -> tuple[int, int, int, int]:
+    x1 = max(0.0, min(1.0, float(bbox.get("x1", 0.0))))
+    y1 = max(0.0, min(1.0, float(bbox.get("y1", 0.0))))
+    x2 = max(0.0, min(1.0, float(bbox.get("x2", 1.0))))
+    y2 = max(0.0, min(1.0, float(bbox.get("y2", 1.0))))
+    if x2 <= x1 or y2 <= y1:
+        raise ValueError(f"invalid bbox: {bbox}")
+    px = (
+        int(x1 * w),
+        int(y1 * h),
+        max(int(x2 * w), int(x1 * w) + 1),
+        max(int(y2 * h), int(y1 * h) + 1),
+    )
+    return px
+
+
+def _output_path(kind: str, suffix: str = "png") -> str:
+    d = os.path.join(_cache_dir(), kind)
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, f"{int(time.time() * 1000)}-{secrets.token_hex(4)}.{suffix}")
+
+
+def _exif_brief(image: Image.Image) -> dict:
+    try:
+        exif = image.getexif()
+    except Exception:
+        return {}
+    labels = {
+        271: "make",
+        272: "model",
+        306: "datetime",
+        36867: "datetime_original",
+        33432: "copyright",
+    }
+    out: dict = {}
+    for tag, name in labels.items():
+        if tag in exif and exif[tag]:
+            out[name] = str(exif[tag])
+    if 34853 in exif:
+        gps = {tag: val for tag, val in exif[34853].items()}
+        if gps:
+            out["gps"] = True
+    return out
+
+
+def handle_metadata(params: dict) -> dict:
+    source = params["source"]
+    stat = os.stat(source["path"]) if source.get("type") == "path" else None
+    image = _resolve_image(source)
+    fmt = (image.format or "unknown").upper()
+    dpi = image.info.get("dpi")
+    result = {
+        "width": image.width,
+        "height": image.height,
+        "format": fmt,
+        "mode": image.mode,
+        "dpi": [float(dpi[0]), float(dpi[1])] if dpi else None,
+        "exif": _exif_brief(image),
+    }
+    if stat is not None:
+        result["bytes"] = stat.st_size
+    return {"result": {"type": "metadata", **result}}
+
+
+def handle_crop(params: dict) -> dict:
+    source = params["source"]
+    image = _resolve_image(source).convert("RGB")
+    w, h = image.size
+    x1, y1, x2, y2 = _bbox_to_px(params["bbox"], w, h)
+    crop = image.crop((x1, y1, x2, y2))
+    path = _output_path("crops")
+    crop.save(path)
+    return {
+        "result": {
+            "type": "crop",
+            "path": path,
+            "width": crop.width,
+            "height": crop.height,
+            "bbox_px": [x1, y1, x2, y2],
+        }
+    }
+
+
+def handle_zoom(params: dict) -> dict:
+    source = params["source"]
+    image = _resolve_image(source).convert("RGB")
+    w, h = image.size
+    region = params.get("region")
+    if region:
+        x1, y1, x2, y2 = _bbox_to_px(region, w, h)
+        region_img = image.crop((x1, y1, x2, y2))
+    else:
+        region_img = image
+    scale = max(1.0, min(8.0, float(params.get("scale", 2.0))))
+    tw, th = int(region_img.width * scale), int(region_img.height * scale)
+    if tw * th > 24_000_000:
+        factor = (24_000_000 / (tw * th)) ** 0.5
+        tw, th = int(tw * factor), int(th * factor)
+        scale = th / region_img.height
+    upscaled = region_img.resize((tw, th), Image.LANCZOS)
+    path = _output_path("zooms")
+    upscaled.save(path)
+
+    out: dict = {
+        "type": "zoom",
+        "path": path,
+        "width": tw,
+        "height": th,
+        "scale": round(scale, 2),
+    }
+    analyze = str(params.get("analyze", "none")).strip().lower()
+    if analyze in ("ocr", "caption"):
+        model = _ensure_model(params.get("model"))
+        upscaled_rgb = upscaled.convert("RGB")
+        res = _timed(
+            model.caption if analyze == "caption" else model.query,
+            upscaled_rgb,
+            **(
+                {"question": "Transcribe all text in this image exactly."}
+                if analyze == "ocr"
+                else {"length": "normal"}
+            ),
+        )
+        text = res.get("caption") if analyze == "caption" else res.get("answer")
+        out["analysis"] = {"kind": analyze, "text": text}
+    elif analyze == "query":
+        question = str(params.get("question") or "").strip()
+        if not question:
+            raise ValueError("analyze='query' requires a 'question'")
+        model = _ensure_model(params.get("model"))
+        res = _timed(model.query, upscaled.convert("RGB"), question=question)
+        out["analysis"] = {"kind": "query", "text": res.get("answer")}
+    return {"result": out}
+
+
+def handle_colors(params: dict) -> dict:
+    source = params["source"]
+    image = _resolve_image(source).convert("RGB")
+    w, h = image.size
+    region = params.get("region")
+    if region:
+        x1, y1, x2, y2 = _bbox_to_px(region, w, h)
+        image = image.crop((x1, y1, x2, y2))
+        w, h = image.size
+    palette = image.quantize(colors=5, method=2)
+    counts = sorted(palette.getcolors(maxcolors=100000), reverse=True)
+    total = w * h or 1
+    dominant = []
+    for count, idx in counts:
+        r, g, b = palette.getpalette()[idx * 3 : idx * 3 + 3]  # type: ignore[index]
+        dominant.append(
+            {"hex": "#%02x%02x%02x" % (r, g, b), "share": round(count / total, 3)}
+        )
+    gray = image.convert("L")
+    hist = gray.histogram()
+    buckets = {"dark": 0, "mid": 0, "bright": 0}
+    for i, c in enumerate(hist):
+        if i < 56:
+            buckets["dark"] += c
+        elif i < 200:
+            buckets["mid"] += c
+        else:
+            buckets["bright"] += c
+    buckets = {k: round(v / total, 3) for k, v in buckets.items()}
+    avg = tuple(round(v) for v in image.resize((1, 1)).getpixel((0, 0)))
+    return {
+        "result": {
+            "type": "colors",
+            "palette": dominant,
+            "buckets": buckets,
+            "avg_rgb": avg,
+            "regions_analyzed": 1,
+        }
+    }
+
+
+def handle_diff(params: dict) -> dict:
+    source = params["source"]
+    other = params["other"]
+    a = _resolve_image(source).convert("RGB")
+    b = _resolve_image(other).convert("RGB")
+    if a.size != b.size:
+        b = b.resize(a.size, Image.LANCZOS)
+    from PIL import ImageChops, ImageFilter
+
+    delta = ImageChops.difference(a, b).convert("L")
+    delta = delta.filter(ImageFilter.GaussianBlur(1.5))
+    bands = delta.point(lambda p: 255 if p > 24 else 0)
+    total = a.width * a.height or 1
+    changed = 0
+    regions = []
+    # band-row scan for changed regions
+    rows = []
+    for y in range(0, a.height, 8):
+        row_changed = (
+            sum(bands.crop((0, y, a.width, min(y + 8, a.height))).getdata()) > 0
+        )
+        if row_changed:
+            rows.append(y)
+    for y in rows:
+        xs = [
+            x
+            for x in range(0, a.width, 8)
+            if bands.getpixel((x, min(y, a.height - 1))) > 0
+        ]
+        if not xs:
+            continue
+        x1, x2 = xs[0] / a.width, (xs[-1] + 8) / a.width
+        y1, y2 = y / a.height, (y + 8) / a.height
+        if (
+            regions
+            and y1 - regions[-1]["y2"] <= 0.02
+            and x1 <= regions[-1]["x2"]
+            and x2 >= regions[-1]["x1"]
+        ):
+            regions[-1]["y2"] = y2
+            regions[-1]["x1"] = min(regions[-1]["x1"], x1)
+            regions[-1]["x2"] = max(regions[-1]["x2"], x2)
+        else:
+            regions.append(
+                {
+                    "x1": round(x1, 3),
+                    "y1": round(y1, 3),
+                    "x2": round(x2, 3),
+                    "y2": round(y2, 3),
+                }
+            )
+    diff_px = sum(bands.point(lambda p: 1 if p > 0 else 0).getdata())
+    out: dict = {
+        "type": "diff",
+        "changed_pct": round(diff_px / total, 4),
+        "regions": regions[:12],
+        "width": a.width,
+        "height": a.height,
+    }
+    if params.get("describe"):
+        model = _ensure_model(params.get("model"))
+        # composite: left source, right diff highlighted
+        composite = Image.new("RGB", (a.width * 2, a.height))
+        composite.paste(a, (0, 0))
+        highlight = a.copy()
+        highlight = Image.composite(
+            Image.new("RGB", a.size, (255, 255, 255)),
+            highlight,
+            bands.point(lambda p: 160 if p > 0 else 0),
+        )
+        composite.paste(highlight, (a.width, 0))
+        composite.thumbnail((1600, 1200))
+        res = _timed(
+            model.query,
+            composite,
+            question="The right half highlights all pixels that changed versus the left image (white overlay). Describe in one or two sentences what changed and where.",
+        )
+        out["description"] = res.get("answer")
+    return {"result": out}
+
+
+def handle_annotate(params: dict) -> dict:
+    source = params["source"]
+    image = _resolve_image(source).convert("RGB")
+    boxes = params.get("boxes") or []
+    points = params.get("points") or []
+    logo = params.get("label") or ""
+    if boxes or points:
+        from PIL import ImageDraw
+
+        draw = ImageDraw.Draw(image)
+        w, h = image.size
+        box_color = str(params.get("color") or "#ff3355")
+        for b in boxes:
+            x1, y1, x2, y2 = _bbox_to_px(b, w, h)
+            draw.rectangle([x1, y1, x2, y2], outline=box_color, width=max(2, w // 400))
+            label = b.get("label") or logo
+            if label:
+                draw.text((x1, max(0, y1 - 14)), label, fill=box_color)
+        for p in points:
+            label = p.get("label") or logo
+            cx, cy = (
+                round(float(p.get("x", 0.5)) * w),
+                round(float(p.get("y", 0.5)) * h),
+            )
+            r = max(4, w // 220)
+            draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=box_color, width=2)
+            if label:
+                draw.text((cx + r + 2, cy - 6), label, fill=box_color)
+    path = _output_path("annotations")
+    image.save(path)
+    return {
+        "result": {
+            "type": "annotate",
+            "path": path,
+            "width": image.width,
+            "height": image.height,
+        }
+    }
+
+
+def _dhash64(image: Image.Image) -> int:
+    gray = image.convert("L").resize((9, 8), Image.LANCZOS)
+    px = list(gray.getdata())
+    value = 0
+    for y in range(8):
+        for x in range(8):
+            value = (value << 1) | (1 if px[y * 9 + x] < px[y * 9 + x + 1] else 0)
+    return value
+
+
+def _hamming(a: int, b: int) -> int:
+    return bin(a ^ b).count("1")
+
+
+def _iter_images(root: str, recursive: bool):
+    if not os.path.isdir(root):
+        return
+    if recursive:
+        for dirpath, _dirnames, filenames in os.walk(root):
+            if ".venv" in dirpath or "node_modules" in dirpath or ".git" in dirpath:
+                continue
+            for name in filenames:
+                yield os.path.join(dirpath, name)
+    else:
+        for name in os.listdir(root):
+            yield os.path.join(root, name)
+
+
+IMAGE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".bmp",
+    ".avif",
+    ".tiff",
+    ".tif",
+    ".heic",
+}
+
+
+def handle_hash_search(params: dict) -> dict:
+    source = params["source"]
+    query = _dhash64(_resolve_image(source).convert("RGB"))
+    root = str(params.get("dir") or "").strip()
+    roots = []
+    if root:
+        roots.append(root)
+        roots.append(os.path.join(_cache_dir(), "fetched"))
+    else:
+        roots.append(_cache_dir())
+    limit = max(1, min(25, int(params.get("limit", 8))))
+    matches = []
+    seen: set[str] = set()
+    for base in roots:
+        for path in _iter_images(base, bool(params.get("recursive", True))):
+            if path in seen or not path.lower().endswith(tuple(IMAGE_EXTENSIONS)):
+                continue
+            seen.add(path)
+            try:
+                d = _dhash64(Image.open(path).convert("RGB"))
+            except Exception:
+                continue
+            dist = _hamming(query, d)
+            if dist <= 6:
+                matches.append(
+                    {
+                        "path": path,
+                        "hamming": dist,
+                        "similarity": round(1 - dist / 64, 3),
+                    }
+                )
+    matches.sort(key=lambda m: m["hamming"])
+    return {
+        "result": {
+            "type": "hash_search",
+            "matches": matches[:limit],
+            "scanned": len(seen),
+            "limit": limit,
+        }
+    }
+
+
+def _yandex_reverse(image_path: str) -> dict:
+    """Upload an image to Yandex reverse image search. No API key required;
+    follows the public search-by-image flow (multipart `upfile` POST to
+    /images/search). May hit captcha/rate limits — errors are returned
+    gracefully with a browser-ready fallback URL."""
+    with open(image_path, "rb") as fh:
+        image_bytes = fh.read()
+    ext = os.path.splitext(image_path)[1].lower().lstrip(".") or "jpg"
+    mime = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "gif": "image/gif",
+        "bmp": "image/bmp",
+        "avif": "image/avif",
+        "heic": "image/heic",
+    }.get(ext, "application/octet-stream")
+    boundary = "----SensesBoundary" + secrets.token_hex(8)
+    body = io.BytesIO()
+    body.write(f"--{boundary}\r\n".encode())
+    body.write(
+        f'Content-Disposition: form-data; name="upfile"; filename="image.{ext}"\r\n'
+        f"Content-Type: {mime}\r\n\r\n".encode()
+    )
+    body.write(image_bytes)
+    body.write(f"\r\n--{boundary}--\r\n".encode())
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+    opener.addheaders = [
+        (
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        ),
+        ("Accept", "*/*"),
+    ]
+    # Prime session cookies first — the search endpoint rejects cookie-less
+    # uploads.
+    landing = "https://yandex.com/images/search?rpt=imageview"
+    try:
+        with opener.open(urllib.request.Request(landing), timeout=20) as resp:
+            resp.read()
+    except Exception as exc:
+        raise ValueError(
+            f"Yandex reverse search could not reach {landing} ({exc}). Open it manually."
+        )
+    search_url = landing + "&cbir_page=sites"
+    try:
+        req = urllib.request.Request(
+            search_url,
+            data=body.getvalue(),
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Referer": landing,
+            },
+            method="POST",
+        )
+        with opener.open(req, timeout=30) as resp:
+            final_url = resp.geturl()
+            html = resp.read().decode("utf-8", "replace")
+    except Exception as exc:
+        raise ValueError(
+            f"Yandex reverse search failed ({exc}). Open {landing} and upload manually."
+        )
+    out_matches: list[dict] = []
+    pos_urls = re.findall(r'"pos_url":"([^"]+)"', html)[:6]
+    for raw in pos_urls:
+        url_value = raw.replace("\\/", "/")
+        if url_value.startswith("//"):
+            url_value = "https:" + url_value
+        out_matches.append({"url": url_value, "source": "yandex", "title": None})
+    if not out_matches:
+        titles = re.findall(r'"title":"([^"]+)"', html)[:3]
+        out_matches = [
+            {"url": None, "source": "yandex", "title": t.replace("\\/", "/")[:120]}
+            for t in titles
+        ]
+    return {"provider": "yandex", "search_url": final_url, "matches": out_matches}
+
+
+def handle_reverse(params: dict) -> dict:
+    source = params["source"]
+    providers = [
+        p.strip().lower()
+        for p in str(params.get("providers") or "local,yandex").split(",")
+    ]
+    out: dict = {
+        "type": "reverse",
+        "query": source.get("path") or "inline-image",
+        "results": [],
+    }
+    if "local" in providers:
+        # Reuse hash_search over the cache + optional project dir.
+        local = handle_hash_search(params)
+        local_res = local["result"]
+        out["results"].append(
+            {
+                "provider": "local",
+                "matches": [
+                    {"path": m["path"], "similarity": m["similarity"]}
+                    for m in local_res["matches"]
+                ],
+                "scanned": local_res["scanned"],
+            }
+        )
+    if "yandex" in providers:
+        if source.get("type") != "path":
+            raise ValueError(
+                "yandex reverse search requires a file path (upload the file first)"
+            )
+        out["results"].append(_yandex_reverse(source["path"]))
+    return {"result": out}
+
+
 def handle_shutdown(_params: dict) -> dict:
     _unload_model()
     sys.stdout.write(json.dumps({"id": -1, "result": {"shutdown": True}}) + "\n")
@@ -421,6 +983,14 @@ METHODS: Dict[str, Any] = {
     "point": handle_point,
     "segment": handle_segment,
     "ocr": handle_ocr,
+    "metadata": handle_metadata,
+    "crop": handle_crop,
+    "zoom": handle_zoom,
+    "colors": handle_colors,
+    "diff": handle_diff,
+    "annotate": handle_annotate,
+    "hash_search": handle_hash_search,
+    "reverse": handle_reverse,
     "shutdown": handle_shutdown,
 }
 
