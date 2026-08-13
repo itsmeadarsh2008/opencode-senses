@@ -372,7 +372,7 @@ src/core/context-builder.ts  guards + evidence rendering (<SENSES> blocks)
 python/runtime.py        the vision runtime: Moondream + all analysis handlers
 ```
 
-PRs welcome; snark also welcome, but keep the two invariants: everything the model reads from an image stays inside `<SENSES>` guards, and no analysis handler may ever block message submission.
+PRs welcome; snark also welcome, but keep the two invariants: everything the model reads from an image stays inside `<SENSES>` guards, and no analysis handler may ever block message submission. See [CONTRIBUTING](CONTRIBUTING.md), our [Code of Conduct](CODE_OF_CONDUCT.md), and how to report issues in [SECURITY](SECURITY.md).
 
 ## License
 
