@@ -61,12 +61,25 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 ## How it works
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "'JetBrains Mono', 'Fira Code', 'Cascadia Mono', Menlo, Consolas, monospace", "fontSize": "13px", "primaryColor": "#111111", "primaryTextColor": "#ffffff", "primaryBorderColor": "#333333", "lineColor": "#6b6b6b", "textColor": "#e5e5e5", "edgeLabelBackground": "#111111", "clusterBkg": "#111111", "clusterBorder": "#333333"}}}%%
 flowchart LR
-    A["OpenCode<br/>(text-only model)"] -->|"attaches an image"| B["OpenCode Senses Plugin<br/>(TypeScript, in-session)"]
-    B -->|"auto-inject: &lt;SENSES&gt; evidence"| A
-    B <-->|"stdio JSON-RPC"| C["Python Runtime<br/>(python/runtime.py)"]
-    C -->|"Moondream 2 via Photon/kestrel<br/>(local GPU inference)"| D["Structured evidence<br/>(OCR, layout, bboxes, colors)"]
-    D -.->|"senses_* tools<br/>inspect / ocr / detect / point / segment<br/>crop / zoom / colors / diff / annotate<br/>metadata / reverse / status"| B
+    A["OpenCode<br/>(text-only model)"]
+    B["OpenCode Senses Plugin<br/>(TypeScript, in-session)"]
+    C["Python Runtime<br/>(python/runtime.py)"]
+    D["Structured evidence<br/>(OCR, layout, bboxes, colors)"]
+    A -->|"attaches an image"| B
+    B -->|"auto-inject evidence"| A
+    B <-->|"stdio JSON-RPC"| C
+    C -->|"Moondream 2 via Photon/kestrel<br/>(local GPU inference)"| D
+    D -.->|"senses_* tools &mdash; inspect, ocr, detect, point, segment,<br/>crop, zoom, colors, diff, annotate, metadata, reverse, status"| B
+    classDef opencode fill:#3f3f46,stroke:#52525b,stroke-width:2px,color:#ffffff
+    classDef plugin fill:#ef4444,stroke:#7f1d1d,stroke-width:2px,color:#ffffff
+    classDef runtime fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#ffffff
+    classDef evidence fill:#22c55e,stroke:#14532d,stroke-width:2px,color:#ffffff
+    class A opencode
+    class B plugin
+    class C runtime
+    class D evidence
 ```
 
 - The **plugin** (TypeScript, runs inside the OpenCode session) spawns the Python runtime, exposes the `senses_*` tools, and auto-inspects images the moment they are attached. It is punctual because it respects you.
