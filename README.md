@@ -45,6 +45,15 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 
 </div>
 
+<p align="center">
+<a href="https://github.com/sponsors/itsmeadarsh2008">
+<img src="https://img.shields.io/badge/%E2%99%A5%20Sponsor%20on%20GitHub-111111?style=for-the-badge&logo=github&logoColor=white" alt="Sponsor on GitHub">
+</a>
+<a href="https://www.buymeacoffee.com/itsmeadarsh">
+<img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-111111?style=for-the-badge&logo=buymeacoffee&logoColor=white" alt="Buy me a coffee">
+</a>
+</p>
+
 ---
 
 ## Features
