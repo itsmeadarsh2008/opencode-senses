@@ -1,15 +1,15 @@
 # OpenCode Senses
 
-[![version](https://img.shields.io/badge/version-v0.1.0-111111?style=flat&labelColor=111111&color=111111)]()
-[![npm](https://img.shields.io/badge/npm-opencode--senses-111111?style=flat&labelColor=111111&color=111111)](https://www.npmjs.com/package/opencode-senses)
-[![license](https://img.shields.io/badge/license-Apache--2.0-111111?style=flat&labelColor=111111&color=111111)](LICENSE)
-[![OpenCode plugin](https://img.shields.io/badge/OpenCode%20plugin-111111?style=flat&labelColor=111111&color=111111)](https://opencode.ai)
-[![privacy](https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&labelColor=111111&color=111111)]()
-[![emojis](https://img.shields.io/badge/emojis-0%20harmed-111111?style=flat&labelColor=111111&color=111111)]()
-[![cross-platform](https://img.shields.io/badge/cross--platform-111111?style=flat&labelColor=111111&color=111111)]()
-[![NVIDIA GPU](https://img.shields.io/badge/NVIDIA%20GPU-111111?style=flat&labelColor=111111&color=111111)]()
-[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-111111?style=flat&labelColor=111111&color=111111)]()
-[![Moondream 2](https://img.shields.io/badge/Moondream%202-111111?style=flat&labelColor=111111&color=111111)](https://moondream.ai)
+[![stars](https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=stars&labelColor=111111&color=111111)]()
+[![forks](https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=forks&labelColor=111111&color=111111)]()
+[![issues](https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=issues&labelColor=111111&color=111111)]()
+[![license](https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=license&labelColor=111111&color=111111)]()
+[![last commit](https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=last%20commit&labelColor=111111&color=111111)]()
+[![npm version](https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=white&label=npm&labelColor=111111&color=111111)]()
+[![downloads](https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=white&label=downloads&labelColor=111111&color=111111)]()
+[![language](https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=white&label=language&labelColor=111111&color=111111)]()
+[![privacy](https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=white&labelColor=111111&color=111111)]()
+[![model](https://img.shields.io/badge/model-moondream%202-111111?style=flat&logo=huggingface&logoColor=white&labelColor=111111&color=111111)]()
 
 **Vision for text-only OpenCode models — fully local, private, free, and slightly smug about it.**
 
