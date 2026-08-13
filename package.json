@@ -1,6 +1,6 @@
 {
   "name": "opencode-senses",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The vision plugin for OpenCode that truly understands images. Inspect, read, and reason about any screenshot or picture with deeper understanding than any other plugin — fully local, private, and free.",
   "type": "module",
   "author": "opencode-senses",
