@@ -4,14 +4,14 @@
 
 # OpenCode Senses
 
-[![stars](https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=stars&labelColor=111111&color=111111)]()
-[![forks](https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=forks&labelColor=111111&color=111111)]()
-[![issues](https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=issues&labelColor=111111&color=111111)]()
-[![license](https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=license&labelColor=111111&color=111111)]()
-[![last commit](https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=last%20commit&labelColor=111111&color=111111)]()
-[![npm version](https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=white&label=npm&labelColor=111111&color=111111)]()
-[![downloads](https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=white&label=downloads&labelColor=111111&color=111111)]()
-[![language](https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=white&label=language&labelColor=111111&color=111111)]()
+[![stars](https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=stars&labelColor=111111&color=111111&v=2)]()
+[![forks](https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=forks&labelColor=111111&color=111111&v=2)]()
+[![issues](https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=issues&labelColor=111111&color=111111&v=2)]()
+[![license](https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=license&labelColor=111111&color=111111&v=2)]()
+[![last commit](https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=last%20commit&labelColor=111111&color=111111&v=2)]()
+[![npm version](https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=white&label=npm&labelColor=111111&color=111111&v=2)]()
+[![downloads](https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=white&label=downloads&labelColor=111111&color=111111&v=2)]()
+[![language](https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=white&label=language&labelColor=111111&color=111111&v=2)]()
 [![privacy](https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=white&labelColor=111111&color=111111)]()
 [![opencode plugin](https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=terminal&logoColor=white&labelColor=111111&color=111111)](https://opencode.ai)
 [![model](https://img.shields.io/badge/model-moondream%202-111111?style=flat&logo=huggingface&logoColor=white&labelColor=111111&color=111111)]()
