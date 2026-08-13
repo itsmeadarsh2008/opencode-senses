@@ -1,8 +1,8 @@
-# OpenCode Senses
-
 <p align="center">
 <img src="media/banner.svg" alt="OpenCode Senses banner" width="100%">
 </p>
+
+# OpenCode Senses
 
 [![stars](https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=stars&labelColor=111111&color=111111)]()
 [![forks](https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=forks&labelColor=111111&color=111111)]()
@@ -26,19 +26,24 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 
 ## Table of contents
 
-- [Features](#features)
-- [How it works](#how-it-works)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Quick start](#quick-start-5-minutes)
-- [Usage](#usage)
-- [The tools](#the-tools-in-detail)
-- [Workflows](#workflows)
-- [Configuration](#configuration)
-- [Privacy](#privacy)
-- [Troubleshooting](#troubleshooting)
-- [Development](#development-build-from-source)
-- [License](#license)
+<div align="center">
+
+| | | |
+|---|---|---|
+| [Features](#features) | [How it works](#how-it-works) | [Requirements](#requirements) |
+| [Installation](#installation) | [Quick start](#quick-start-5-minutes) | [Usage](#usage) |
+| [The tools](#the-tools-in-detail) | [Workflows](#workflows) | [Configuration](#configuration) |
+| [Privacy](#privacy) | [Troubleshooting](#troubleshooting) | [Development](#development-build-from-source) |
+
+</div>
+
+<div align="center">
+
+| More |
+|---|
+| [License](#license) |
+
+</div>
 
 ---
 
