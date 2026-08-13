@@ -1,9 +1,12 @@
 {
   "name": "opencode-senses",
-  "version": "0.1.2",
-  "description": "The vision plugin for OpenCode that truly understands images. Inspect, read, and reason about any screenshot or picture with deeper understanding than any other plugin — fully local, private, and free.",
+  "version": "0.1.3",
+  "description": "Vision for text-only OpenCode models. Attach a screenshot, mockup, or web URL, and the model sees it — grounded OCR, layout, object detection, colors, image diffing, and 13 senses_* tools. Fully local, private, and free.",
   "type": "module",
-  "author": "opencode-senses",
+  "author": {
+    "name": "Adarsh Gourab Mahalik",
+    "url": "https://github.com/itsmeadarsh2008"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
