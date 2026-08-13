@@ -30,10 +30,10 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 
 | | | |
 |---|---|---|
-| [Features](#features) | [How it works](#how-it-works) | [Requirements](#requirements) |
-| [Installation](#installation) | [Quick start](#quick-start-5-minutes) | [Usage](#usage) |
-| [The tools](#the-tools-in-detail) | [Workflows](#workflows) | [Configuration](#configuration) |
-| [Privacy](#privacy) | [Troubleshooting](#troubleshooting) | [Development](#development-build-from-source) |
+| [✨ Features](#features) | [⚙️ How it works](#how-it-works) | [🧰 Requirements](#requirements) |
+| [📦 Installation](#installation) | [🚀 Quick start](#quick-start-5-minutes) | [✍️ Usage](#usage) |
+| [🔧 The tools](#the-tools-in-detail) | [🔁 Workflows](#workflows) | [🎛️ Configuration](#configuration) |
+| [🔒 Privacy](#privacy) | [🩹 Troubleshooting](#troubleshooting) | [🛠️ Development](#development-build-from-source) |
 
 </div>
 
@@ -41,7 +41,7 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 
 | More |
 |---|
-| [License](#license) |
+| [📜 License](#license) |
 
 </div>
 
@@ -60,18 +60,13 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 
 ## How it works
 
-```
-OpenCode (text-only model)
-      |
-      |  <SENSES> evidence </SENSES>   (injection-guarded)
-      |
-OpenCode Senses Plugin  --stdio JSON-RPC-->  Python Runtime
-      |                                             |
-      |   senses_inspect / ocr / detect /           |  Moondream 2 via Photon/kestrel
-      |   crop / zoom / diff / reverse +            |  (local GPU inference)
-      |   auto-inject on image attachments          |
-      v                                             v
-   text-only model  <----------  structured evidence
+```mermaid
+flowchart LR
+    A["OpenCode<br/>(text-only model)"] -->|"attaches an image"| B["OpenCode Senses Plugin<br/>(TypeScript, in-session)"]
+    B -->|"auto-inject: &lt;SENSES&gt; evidence"| A
+    B <-->|"stdio JSON-RPC"| C["Python Runtime<br/>(python/runtime.py)"]
+    C -->|"Moondream 2 via Photon/kestrel<br/>(local GPU inference)"| D["Structured evidence<br/>(OCR, layout, bboxes, colors)"]
+    D -.->|"senses_* tools<br/>inspect / ocr / detect / point / segment<br/>crop / zoom / colors / diff / annotate<br/>metadata / reverse / status"| B
 ```
 
 - The **plugin** (TypeScript, runs inside the OpenCode session) spawns the Python runtime, exposes the `senses_*` tools, and auto-inspects images the moment they are attached. It is punctual because it respects you.
