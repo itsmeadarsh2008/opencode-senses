@@ -105,4 +105,4 @@ Found a vulnerability? Do **not** open a public issue. See [SECURITY.md](SECURIT
 
 ## License
 
-By contributing, you agree that your contributions are licensed under [Apache-2.0](LICENSE).
+By contributing, you agree that your contributions are licensed under [MIT](LICENSE).

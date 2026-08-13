@@ -376,6 +376,6 @@ PRs welcome; snark also welcome, but keep the two invariants: everything the mod
 
 ## License
 
-[Apache-2.0](LICENSE)
+[MIT](LICENSE)
 
 Do whatever you like with it: wrap it, ship it, frame it. If it makes you money, buy yourself a better GPU — you've earned it.
