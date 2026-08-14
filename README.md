@@ -10,7 +10,7 @@
 [![license](https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=license&labelColor=111111&color=111111&v=2)]()
 [![last commit](https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=last%20commit&labelColor=111111&color=111111&v=2)]()
 [![npm version](https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=white&label=npm&labelColor=111111&color=111111&v=2)]()
-[![downloads](https://img.shields.io/badge/downloads-0-111111?style=flat&logo=npm&logoColor=white&labelColor=111111&color=111111)]()
+[![downloads](https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=white&label=downloads&labelColor=111111&color=111111)]()
 [![language](https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=white&label=language&labelColor=111111&color=111111&v=2)]()
 [![privacy](https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=white&labelColor=111111&color=111111)]()
 [![opencode plugin](https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=terminal&logoColor=white&labelColor=111111&color=111111)](https://opencode.ai)
