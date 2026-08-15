@@ -5,17 +5,17 @@
 # OpenCode Senses
 
 <p align="center">
-<img src="https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=stars&labelColor=111111&color=111111&v=2" alt="stars">
-<img src="https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=forks&labelColor=111111&color=111111&v=2" alt="forks">
-<img src="https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=issues&labelColor=111111&color=111111&v=2" alt="issues">
-<img src="https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=license&labelColor=111111&color=111111&v=2" alt="license">
-<img src="https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=last%20commit&labelColor=111111&color=111111&v=2" alt="last commit">
-<img src="https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=white&label=npm&labelColor=111111&color=111111&v=2" alt="npm version">
-<img src="https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=white&label=downloads&labelColor=111111&color=111111" alt="downloads">
-<img src="https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=white&label=language&labelColor=111111&color=111111&v=2" alt="language">
-<img src="https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=white&labelColor=111111&color=111111" alt="privacy">
-<img src="https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=terminal&logoColor=white&labelColor=111111&color=111111" alt="opencode plugin">
-<img src="https://img.shields.io/badge/model-moondream%202-111111?style=flat&logo=huggingface&logoColor=white&labelColor=111111&color=111111" alt="model">
+<img src="https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=stars&labelColor=111111&color=111111&v=2" alt="stars">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=forks&labelColor=111111&color=111111&v=2" alt="forks">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=issues&labelColor=111111&color=111111&v=2" alt="issues">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=license&labelColor=111111&color=111111&v=2" alt="license">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=last%20commit&labelColor=111111&color=111111&v=2" alt="last commit">&nbsp;&nbsp;
+<img src="https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=npm&labelColor=111111&color=111111&v=2" alt="npm version">&nbsp;&nbsp;
+<img src="https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=downloads&labelColor=111111&color=111111" alt="downloads">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=3178c6&label=language&labelColor=111111&color=111111&v=2" alt="language">&nbsp;&nbsp;
+<img src="https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=e5e5e5&labelColor=111111&color=111111" alt="privacy">&nbsp;&nbsp;
+<img src="https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=terminal&logoColor=5ac8fa&labelColor=111111&color=111111" alt="opencode plugin">&nbsp;&nbsp;
+<img src="https://img.shields.io/badge/model-moondream%202-111111?style=flat&logo=huggingface&logoColor=ffd21e&labelColor=111111&color=111111" alt="model">
 </p>
 
 **Vision for text-only OpenCode models — fully local, private, free, and slightly smug about it.**
