@@ -12,7 +12,8 @@
 <img src="https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=last%20commit&labelColor=111111&color=111111&v=2" alt="last commit">&nbsp;&nbsp;
 <img src="https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=npm&labelColor=111111&color=111111&v=2" alt="npm version">&nbsp;&nbsp;
 <img src="https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=downloads&labelColor=111111&color=111111" alt="downloads">&nbsp;&nbsp;
-<img src="https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=3178c6&label=language&labelColor=111111&color=111111&v=2" alt="language">&nbsp;&nbsp;
+<img src="https://img.shields.io/badge/TypeScript-111111?style=flat&logo=typescript&logoColor=3178c6&labelColor=111111&color=111111" alt="TypeScript">&nbsp;&nbsp;
+<img src="https://img.shields.io/badge/Python-111111?style=flat&logo=python&logoColor=3776ab&labelColor=111111&color=111111" alt="Python">&nbsp;&nbsp;
 <img src="https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=e5e5e5&labelColor=111111&color=111111" alt="privacy">&nbsp;&nbsp;
 <img src="https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=terminal&logoColor=5ac8fa&labelColor=111111&color=111111" alt="opencode plugin">&nbsp;&nbsp;
 <img src="https://img.shields.io/badge/model-moondream%202-111111?style=flat&logo=huggingface&logoColor=ffd21e&labelColor=111111&color=111111" alt="model">

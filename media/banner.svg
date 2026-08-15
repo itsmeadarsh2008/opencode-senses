@@ -1,8 +1,8 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
 
   <!-- flat near-black background, no gradients -->
-  <rect width="1200" height="630" fill="#111111"/>
-  <rect x="1" y="1" width="1198" height="628" fill="none" stroke="#242424" stroke-width="1"/>
+  <rect width="1200" height="630" rx="10" ry="10" fill="#111111"/>
+  <rect x="1" y="1" width="1198" height="628" rx="10" ry="10" fill="none" stroke="#242424" stroke-width="1"/>
 
   <!-- corner ticks -->
   <g stroke="#333333" stroke-width="1.5">
