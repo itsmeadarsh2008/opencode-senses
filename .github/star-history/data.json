@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "repository": "itsmeadarsh2008/opencode-senses",
+  "backfilledAt": "2026-08-15T05:22:01.972Z",
+  "backfill": [
+    {
+      "date": "2026-08-13",
+      "stars": 14
+    },
+    {
+      "date": "2026-08-14",
+      "stars": 51
+    },
+    {
+      "date": "2026-08-15",
+      "stars": 54
+    }
+  ],
+  "snapshots": [
+    {
+      "date": "2026-08-15",
+      "stars": 54
+    }
+  ]
+}
