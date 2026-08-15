@@ -252,7 +252,7 @@ All tools accept either `path` (local file, http(s) URL, or project-relative) or
 | **`senses_colors`** | `path` / `image`, `region` | No model — dominant palette with shares, dark/mid/bright luminance buckets, average RGB. Ground truth the vision model can't give reliably, no matter how confidently it tries. |
 | **`senses_diff`** | `path`/`image` + `otherPath`/`otherImage`, `describe` | Pixel-level change map: % changed + changed-region boxes (anti-aliasing blurred out), optional model summary of the delta. Perfect for render iterations. |
 | **`senses_annotate`** | `path` / `image`, `boxes`, `points`, `color` | Draws boxes/points (same shapes as detect/point output) onto a copy to visually validate what the model found. |
-| **`senses_reverse`** | `path` / `image`, `providers` (`local`, `yandex`), `dir`, `limit` | No-API-key reverse image search. `local` scans your cache (and optional `dir`) with perceptual hashing; `yandex` uploads and returns matching page URLs + a browser-ready search link. Yandex is best-effort — bot protection can leave you with just the search link, like a treasure map missing the X. |
+| **`senses_reverse`** | `path` / `image`, `providers` (`local`, `yandex`), `dir`, `limit` | No-API-key reverse image search. `local` scans your cache (and optional `dir`) with perceptual hashing; `yandex` uploads and returns matching page URLs + a browser-ready search link. Yandex uploads image bytes to Yandex's public CBIR endpoint — opt in by passing `providers:"yandex"`. |
 | **`senses_status`** | — | Model load state, device, VRAM, request count, last inference time. |
 
 ### Examples
@@ -357,7 +357,7 @@ Evidence injected into context is explicitly guarded as **untrusted data** — t
 - **Runtime not starting / `DEPENDENCY_MISSING`** — the interpreter Senses resolved lacks `moondream`. Unset `SENSES_DISABLE_AUTO_PROVISION`, set `SENSES_PYTHON` to an env where `python -c "import moondream"` works, or let it provision once.
 - **`PROVISION_FAILED`** — the auto-venv install hit an error (network, pip, Python version). Remove `~/.cache/opencode-senses/venv` and retry, or set `SENSES_PYTHON`/`SENSES_VENV_DIR` yourself. If it says "Install uv...", the host `python3` couldn't create a venv (missing `ensurepip`, externally-managed env); `curl -LsSf https://astral.sh/uv/install.sh | sh` usually fixes it, since uv can provision its own Python.
 - **First run downloads a lot** — auto-provision installs `moondream` (Torch + CUDA wheels, can take several minutes) before model weights (~3.9 GB) download. With `uv` installed, the pip part is ~10–100x faster and cached at `~/.cache/uv`. Good time to go make coffee. Decaf, if it's late.
-- **Yandex reverse search returns no results** — Yandex occasionally serves bot-protection pages to scripted uploads. The tool still returns the browser-ready search link, or run `senses_reverse` with `providers:"local"` only for the always-free local scan.
+- **Yandex reverse search returns no results or just a search link** — Yandex occasionally serves bot-protection pages to scripted uploads. When that happens, `senses_reverse` returns the browser-ready search link with no matches; open it in a browser to upload by hand, or run `senses_reverse` with `providers:"local"` only for the always-free local scan. The CBIR flow (cbirId upload + `data-state` SSR parse) is the supported path as of 2026-08.
 
 ## Development (build from source)
 

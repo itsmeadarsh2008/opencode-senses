@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
 import io
 import json
 import os
@@ -851,11 +852,132 @@ def handle_hash_search(params: dict) -> dict:
     }
 
 
+_YANDEX_LANDING = "https://yandex.com/images/search?rpt=imageview"
+_YANDEX_UA = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+)
+# Cap how many matches we surface — Yandex often returns 100+ site entries;
+# the first handful are the highest-ranked and most useful.
+_YANDEX_MAX_MATCHES = 8
+
+
+def _yandex_multipart(
+    image_bytes: bytes, filename: str, mime: str
+) -> tuple[bytes, str]:
+    """Build a multipart/form-data body with a single `upfile` field.
+
+    Returns the bytes and the boundary string used (so callers can set the
+    `Content-Type: multipart/form-data; boundary=...` header correctly).
+    """
+    boundary = "----SensesBoundary" + secrets.token_hex(8)
+    out = io.BytesIO()
+    out.write(f"--{boundary}\r\n".encode())
+    out.write(
+        f'Content-Disposition: form-data; name="upfile"; filename="{filename}"\r\n'
+        f"Content-Type: {mime}\r\n\r\n".encode()
+    )
+    out.write(image_bytes)
+    out.write(f"\r\n--{boundary}--\r\n".encode())
+    return out.getvalue(), boundary
+
+
+def _yandex_parse_sites(html_text: str) -> list[dict]:
+    """Extract site matches from a Yandex CBIR results page.
+
+    Yandex embeds SSR state in <div data-state="{...JSON...}"> blobs. The
+    blob with `initialState.cbirSites.sites[]` lists pages that host the
+    uploaded image; `initialState.cbirSimilar.thumbs[]` holds visually
+    similar images (used as a fallback when no exact site matches exist).
+    Each site entry has {title, url, domain, thumb, originalImage}; each
+    similar thumb has {imageUrl, title, linkUrl}.
+    """
+    # data-state values are HTML-attribute-escaped JSON. Use a non-greedy
+    # match anchored on a long-ish blob to avoid grabbing unrelated attrs.
+    states = re.findall(r'data-state="([^"]{500,})"', html_text)
+    if not states:
+        return []
+    init: dict = {}
+    for raw in states:
+        try:
+            obj = json.loads(html.unescape(raw))
+        except (ValueError, TypeError):
+            continue
+        if isinstance(obj, dict) and "initialState" in obj:
+            init = obj["initialState"]
+            break
+    matches: list[dict] = []
+    seen_urls: set[str] = set()
+
+    # 1) Pages that host the exact image (primary).
+    sites = init.get("cbirSites", {}).get("sites", []) if isinstance(init, dict) else []
+    for s in sites:
+        if not isinstance(s, dict):
+            continue
+        url = s.get("url") or s.get("originalImage")
+        title = s.get("title") or s.get("description")
+        if not url:
+            continue
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        matches.append(
+            {
+                "url": url,
+                "source": "yandex",
+                "title": (title[:140] if title else None),
+            }
+        )
+        if len(matches) >= _YANDEX_MAX_MATCHES:
+            return matches
+
+    # 2) Visually similar images (fallback only — looser signal).
+    if not matches:
+        thumbs = (
+            init.get("cbirSimilar", {}).get("thumbs", [])
+            if isinstance(init, dict)
+            else []
+        )
+        for t in thumbs:
+            if not isinstance(t, dict):
+                continue
+            url = t.get("linkUrl") or t.get("imageUrl")
+            title = t.get("title")
+            if not url:
+                continue
+            # linkUrl is a relative /images/search?... path; absolutize it.
+            if url.startswith("/"):
+                url = "https://yandex.com" + url
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            matches.append(
+                {
+                    "url": url,
+                    "source": "yandex",
+                    "title": (title[:140] if title else None),
+                }
+            )
+            if len(matches) >= _YANDEX_MAX_MATCHES:
+                break
+    return matches
+
+
 def _yandex_reverse(image_path: str) -> dict:
-    """Upload an image to Yandex reverse image search. No API key required;
-    follows the public search-by-image flow (multipart `upfile` POST to
-    /images/search). May hit captcha/rate limits — errors are returned
-    gracefully with a browser-ready fallback URL."""
+    """Reverse-search an image via Yandex's public CBIR flow. No API key.
+
+    Two-step (validated 2026-08 against yandex.com):
+      1. POST the image bytes to /images/search with
+         `rpt=imageview&format=json&request={...b-page_type_search-by-image__link...}`.
+         Yandex returns JSON with `blocks[0].params.cbirId` — a server-side
+         handle that identifies the uploaded image.
+      2. GET /images/search?rpt=imageview&cbir_id=<cbirId>. The HTML response
+         embeds SSR `data-state` blobs; `initialState.cbirSites.sites[]`
+         lists pages hosting the image.
+
+    On captcha / non-JSON responses we gracefully return the landing URL
+    with empty matches so callers can fall back to the local hash search.
+    """
     with open(image_path, "rb") as fh:
         image_bytes = fh.read()
     ext = os.path.splitext(image_path)[1].lower().lstrip(".") or "jpg"
@@ -869,65 +991,91 @@ def _yandex_reverse(image_path: str) -> dict:
         "avif": "image/avif",
         "heic": "image/heic",
     }.get(ext, "application/octet-stream")
-    boundary = "----SensesBoundary" + secrets.token_hex(8)
-    body = io.BytesIO()
-    body.write(f"--{boundary}\r\n".encode())
-    body.write(
-        f'Content-Disposition: form-data; name="upfile"; filename="image.{ext}"\r\n'
-        f"Content-Type: {mime}\r\n\r\n".encode()
-    )
-    body.write(image_bytes)
-    body.write(f"\r\n--{boundary}--\r\n".encode())
+
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
     opener.addheaders = [
-        (
-            "User-Agent",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-        ),
-        ("Accept", "*/*"),
+        ("User-Agent", _YANDEX_UA),
+        ("Accept-Language", "en-US,en;q=0.9"),
     ]
-    # Prime session cookies first — the search endpoint rejects cookie-less
-    # uploads.
-    landing = "https://yandex.com/images/search?rpt=imageview"
+
+    # Prime session cookies — Yandex rejects cookie-less uploads.
     try:
-        with opener.open(urllib.request.Request(landing), timeout=20) as resp:
+        with opener.open(urllib.request.Request(_YANDEX_LANDING), timeout=20) as resp:
             resp.read()
     except Exception as exc:
         raise ValueError(
-            f"Yandex reverse search could not reach {landing} ({exc}). Open it manually."
+            f"Yandex reverse search could not reach {_YANDEX_LANDING} ({exc}). "
+            "Open it manually."
         )
-    search_url = landing + "&cbir_page=sites"
+
+    # Step 1: upload image, receive cbirId.
+    body, boundary = _yandex_multipart(image_bytes, f"image.{ext}", mime)
+    upload_url = (
+        _YANDEX_LANDING
+        + "&format=json"
+        + '&request={"blocks":[{"block":"b-page_type_search-by-image__link"}]}'
+    )
     try:
         req = urllib.request.Request(
-            search_url,
-            data=body.getvalue(),
+            upload_url,
+            data=body,
             headers={
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "Referer": landing,
+                "Referer": _YANDEX_LANDING,
             },
             method="POST",
         )
-        with opener.open(req, timeout=30) as resp:
-            final_url = resp.geturl()
-            html = resp.read().decode("utf-8", "replace")
+        with opener.open(req, timeout=40) as resp:
+            resp_bytes = resp.read()
     except Exception as exc:
         raise ValueError(
-            f"Yandex reverse search failed ({exc}). Open {landing} and upload manually."
+            f"Yandex reverse search upload failed ({exc}). "
+            f"Open {_YANDEX_LANDING} and upload manually."
         )
-    out_matches: list[dict] = []
-    pos_urls = re.findall(r'"pos_url":"([^"]+)"', html)[:6]
-    for raw in pos_urls:
-        url_value = raw.replace("\\/", "/")
-        if url_value.startswith("//"):
-            url_value = "https:" + url_value
-        out_matches.append({"url": url_value, "source": "yandex", "title": None})
-    if not out_matches:
-        titles = re.findall(r'"title":"([^"]+)"', html)[:3]
-        out_matches = [
-            {"url": None, "source": "yandex", "title": t.replace("\\/", "/")[:120]}
-            for t in titles
-        ]
-    return {"provider": "yandex", "search_url": final_url, "matches": out_matches}
+
+    cbir_id = ""
+    try:
+        data = json.loads(resp_bytes)
+        blocks = data.get("blocks") or []
+        if blocks and isinstance(blocks[0], dict):
+            params = blocks[0].get("params") or {}
+            cbir_id = params.get("cbirId") or ""
+    except (ValueError, TypeError):
+        pass
+    if not cbir_id:
+        # Captcha / bot-protection: Yandex returned HTML or an empty JSON
+        # shell instead of a cbirId. Hand back the landing URL so the user
+        # can upload manually in a browser.
+        return {
+            "provider": "yandex",
+            "search_url": _YANDEX_LANDING,
+            "matches": [],
+        }
+
+    # Step 2: fetch the results page for this cbirId, parse SSR state.
+    results_url = (
+        "https://yandex.com/images/search?rpt=imageview&cbir_id="
+        + urllib.parse.quote(cbir_id, safe="")
+    )
+    try:
+        results_req = urllib.request.Request(
+            results_url,
+            headers={"Referer": _YANDEX_LANDING},
+        )
+        with opener.open(results_req, timeout=30) as resp:
+            html_text = resp.read().decode("utf-8", "replace")
+    except Exception as exc:
+        raise ValueError(
+            f"Yandex reverse search results fetch failed ({exc}). "
+            f"Open {results_url} in a browser."
+        )
+
+    matches = _yandex_parse_sites(html_text)
+    return {
+        "provider": "yandex",
+        "search_url": results_url,
+        "matches": matches,
+    }
 
 
 def handle_reverse(params: dict) -> dict:

@@ -1,5 +1,5 @@
 import { describe, expect, it, afterAll } from "bun:test";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -169,5 +169,110 @@ describe("python runtime analysis handlers", () => {
     expect(
       rpc("metadata", { source: { type: "path", path: "/nonexistent/nope.png" } }),
     ).rejects.toThrow();
+  });
+});
+
+// Offline parser tests for the Yandex CBIR SSR-state extractor. No network —
+// these feed a minimal HTML fixture (mirroring Yandex's real `data-state`
+// SSR shape) directly to runtime._yandex_parse_sites via a one-shot Python
+// subprocess and assert the matches come back.
+describe("yandex reverse parser", () => {
+  // Build a <div data-state="{...escaped JSON...}"> fixture. The JSON must
+  // be HTML-attribute-escaped (quotes become ") and the blob must be
+  // >=500 chars (parser's noise filter ignores shorter attrs).
+  function fixture(sites: unknown, thumbs: unknown): string {
+    const blob = JSON.stringify({
+      initialState: {
+        cbirSites: { sites, moreButtonUrl: "", pageSize: 0 },
+        cbirSimilar: { thumbs, similarPageUrl: "", rowHeight: 100 },
+        // Padding so the data-state value clears the 500-char floor in the
+        // parser's regex. Real Yandex pages embed a much larger state.
+        _padding: "x".repeat(600),
+      },
+    });
+    // HTML-attribute-escape: the value sits inside data-state="...".
+    // Use Unicode escapes for the replacement entities so the TS/JS source
+    // stays unambiguous (no stray `"` or `<` chars that confuse parsers).
+    const escAmp = "\u0026amp;";      // &
+    const escQuot = "\u0026quot;";    // "
+    const escLt = "\u0026lt;";       // <
+    const escaped = blob
+      .replace(/&/g, escAmp)
+      .replace(/"/g, escQuot)
+      .replace(/</g, escLt);
+    return `<html><body><div data-state="${escaped}"></div></body></html>`;
+  }
+
+  function parse(html: string): { url: string | null; title: string | null; source: string }[] {
+    const r = spawnSync(VENV_PYTHON, ["-c", `
+import json, sys, importlib.util
+spec = importlib.util.spec_from_file_location("rt", ${JSON.stringify(RUNTIME)})
+rt = importlib.util.module_from_spec(spec); spec.loader.exec_module(rt)
+print(json.dumps(rt._yandex_parse_sites(sys.stdin.read())))
+`], { input: html, encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`parser exited ${r.status}: ${r.stderr}`);
+    return JSON.parse(r.stdout);
+  }
+
+  it("extracts entries from cbirSites.sites[]", () => {
+    const html = fixture(
+      [
+        { title: "Example Page", url: "https://example.com/page1", domain: "example.com", thumb: {}, originalImage: "https://example.com/img.png" },
+        { title: "Second Hit", url: "https://news.example.com/article", domain: "news.example.com" },
+      ],
+      [],
+    );
+    const matches = parse(html);
+    expect(matches.length).toBe(2);
+    expect(matches[0].url).toBe("https://example.com/page1");
+    expect(matches[0].title).toBe("Example Page");
+    expect(matches[0].source).toBe("yandex");
+    expect(matches[1].url).toBe("https://news.example.com/article");
+    expect(matches[1].title).toBe("Second Hit");
+  });
+
+  it("falls back to cbirSimilar.thumbs[] when no sites host the image", () => {
+    const html = fixture(
+      [],
+      [
+        { imageUrl: "https://cdn.x.com/a.jpg", title: "Lookalike 1", linkUrl: "/images/search?img_url=foo" },
+        { imageUrl: "https://cdn.x.com/b.jpg", title: "Lookalike 2", linkUrl: "/images/search?img_url=bar" },
+      ],
+    );
+    const matches = parse(html);
+    // No exact sites → thumbs take over, with relative linkUrls absolutized.
+    expect(matches.length).toBe(2);
+    expect(matches[0].url).toBe("https://yandex.com/images/search?img_url=foo");
+    expect(matches[0].title).toBe("Lookalike 1");
+    expect(matches[1].url).toBe("https://yandex.com/images/search?img_url=bar");
+  });
+
+  it("prefers sites over similar thumbs when sites have matches", () => {
+    const html = fixture(
+      [{ title: "Real Site", url: "https://real.example.com/x", domain: "real.example.com" }],
+      [{ imageUrl: "https://lookalike.example.com/y.jpg", title: "Lookalike", linkUrl: "/images/search?img_url=z" }],
+    );
+    const matches = parse(html);
+    expect(matches.length).toBe(1);
+    expect(matches[0].url).toBe("https://real.example.com/x");
+  });
+
+  it("deduplicates entries with the same url", () => {
+    const html = fixture(
+      [
+        { title: "First", url: "https://example.com/same", domain: "example.com" },
+        { title: "Dup", url: "https://example.com/same", domain: "example.com" },
+        { title: "Unique", url: "https://example.com/other", domain: "example.com" },
+      ],
+      [],
+    );
+    const matches = parse(html);
+    expect(matches.length).toBe(2);
+    expect(matches[0].title).toBe("First");
+    expect(matches[1].title).toBe("Unique");
+  });
+
+  it("returns an empty list when no data-state blob is present", () => {
+    expect(parse("<html><body>no state here</body></html>")).toEqual([]);
   });
 });
