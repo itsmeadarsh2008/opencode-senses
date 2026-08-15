@@ -4,6 +4,7 @@
 
 # OpenCode Senses
 
+<p align="center">
 <img src="https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=stars&labelColor=111111&color=111111&v=2" alt="stars">
 <img src="https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=forks&labelColor=111111&color=111111&v=2" alt="forks">
 <img src="https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=white&label=issues&labelColor=111111&color=111111&v=2" alt="issues">
@@ -15,6 +16,7 @@
 <img src="https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=white&labelColor=111111&color=111111" alt="privacy">
 <img src="https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=terminal&logoColor=white&labelColor=111111&color=111111" alt="opencode plugin">
 <img src="https://img.shields.io/badge/model-moondream%202-111111?style=flat&logo=huggingface&logoColor=white&labelColor=111111&color=111111" alt="model">
+</p>
 
 **Vision for text-only OpenCode models — fully local, private, free, and slightly smug about it.**
 
