@@ -1,15 +1,15 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
 
   <!-- flat near-black background, no gradients -->
-  <rect width="1200" height="630" rx="10" ry="10" fill="#111111"/>
-  <rect x="1" y="1" width="1198" height="628" rx="10" ry="10" fill="none" stroke="#242424" stroke-width="1"/>
+  <rect width="1200" height="630" rx="48" ry="48" fill="#111111"/>
+  <rect x="1" y="1" width="1198" height="628" rx="48" ry="48" fill="none" stroke="#242424" stroke-width="1"/>
 
   <!-- corner ticks -->
   <g stroke="#333333" stroke-width="1.5">
-    <path d="M40 40 H72 M40 40 V72" fill="none"/>
-    <path d="M1160 40 H1128 M1160 40 V72" fill="none"/>
-    <path d="M40 590 H72 M40 590 V558" fill="none"/>
-    <path d="M1160 590 H1128 M1160 590 V558" fill="none"/>
+    <path d="M64 64 H96 M64 64 V96" fill="none"/>
+    <path d="M1136 64 H1104 M1136 64 V96" fill="none"/>
+    <path d="M64 566 H96 M64 566 V534" fill="none"/>
+    <path d="M1136 566 H1104 M1136 566 V534" fill="none"/>
   </g>
 
   <g font-family="ui-monospace, SFMono-Regular, 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace">

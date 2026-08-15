@@ -2,20 +2,25 @@
 <img src="media/banner.svg" alt="OpenCode Senses banner" width="100%">
 </p>
 
-# OpenCode Senses
+<h1 align="center">
+  <picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media/opencode-mark-dark.svg">
+  <img src="media/opencode-mark-light.svg" width="28" height="42" alt="OpenCode logo">
+</picture>
+  OpenCode Senses
+</h1>
 
 <p align="center">
-<img src="https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=stars&labelColor=111111&color=111111&v=2" alt="stars">&nbsp;&nbsp;
-<img src="https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=forks&labelColor=111111&color=111111&v=2" alt="forks">&nbsp;&nbsp;
-<img src="https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=issues&labelColor=111111&color=111111&v=2" alt="issues">&nbsp;&nbsp;
-<img src="https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=license&labelColor=111111&color=111111&v=2" alt="license">&nbsp;&nbsp;
-<img src="https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=last%20commit&labelColor=111111&color=111111&v=2" alt="last commit">&nbsp;&nbsp;
-<img src="https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=npm&labelColor=111111&color=111111&v=2" alt="npm version">&nbsp;&nbsp;
-<img src="https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=downloads&labelColor=111111&color=111111" alt="downloads">&nbsp;&nbsp;
-<img src="https://img.shields.io/badge/TypeScript-111111?style=flat&logo=typescript&logoColor=3178c6&labelColor=111111&color=111111" alt="TypeScript">&nbsp;&nbsp;
-<img src="https://img.shields.io/badge/Python-111111?style=flat&logo=python&logoColor=3776ab&labelColor=111111&color=111111" alt="Python">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/stars/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=stars&labelColor=111111&color=111111&v=3" alt="stars">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/forks/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=forks&labelColor=111111&color=111111&v=3" alt="forks">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/issues/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=issues&labelColor=111111&color=111111&v=3" alt="issues">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/license/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=license&labelColor=111111&color=111111&v=3" alt="license">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/last-commit/itsmeadarsh2008/opencode-senses?style=flat&logo=github&logoColor=f0f6fc&label=last%20commit&labelColor=111111&color=111111&v=3" alt="last commit">&nbsp;&nbsp;
+<img src="https://img.shields.io/npm/v/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=npm&labelColor=111111&color=111111&v=3" alt="npm version">&nbsp;&nbsp;
+<img src="https://img.shields.io/npm/dm/opencode-senses?style=flat&logo=npm&logoColor=cb3837&label=downloads&labelColor=111111&color=111111&v=3" alt="downloads">&nbsp;&nbsp;
+<img src="https://img.shields.io/github/languages/top/itsmeadarsh2008/opencode-senses?style=flat&logo=typescript&logoColor=3178c6&label=language&labelColor=111111&color=111111&v=3" alt="language">&nbsp;&nbsp;
 <img src="https://img.shields.io/badge/privacy-100%25%20local-111111?style=flat&logo=shield&logoColor=e5e5e5&labelColor=111111&color=111111" alt="privacy">&nbsp;&nbsp;
-<img src="https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=terminal&logoColor=5ac8fa&labelColor=111111&color=111111" alt="opencode plugin">&nbsp;&nbsp;
+<img src="https://img.shields.io/badge/opencode-plugin-111111?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAzNic%2BPHBhdGggZD0nTTI0IDM2SDBWNkgyNFYzNlpNMTggMTJINlYzMEgxOFYxMlonIGZpbGw9JyNmZmZmZmYnIGZpbGwtcnVsZT0nZXZlbm9kZCcvPjwvc3ZnPg%3D%3D&labelColor=111111&color=111111" alt="opencode plugin">&nbsp;&nbsp;
 <img src="https://img.shields.io/badge/model-moondream%202-111111?style=flat&logo=huggingface&logoColor=ffd21e&labelColor=111111&color=111111" alt="model">
 </p>
 
@@ -382,3 +387,9 @@ PRs welcome; snark also welcome, but keep the two invariants: everything the mod
 [MIT](LICENSE)
 
 Do whatever you like with it: wrap it, ship it, frame it. If it makes you money, buy yourself a better GPU — you've earned it.
+
+## Star History
+
+Self-hosted via [GH Stars](https://github.com/nicoloboschi/gh-stars) (GitHub's stargazer API is restricted to collaborators, so the chart is built and committed by a workflow using the repo's own token — no third-party service).
+
+<img src="https://raw.githubusercontent.com/itsmeadarsh2008/opencode-senses/main/.github/star-history/chart.svg" alt="Star History Chart" width="100%">
