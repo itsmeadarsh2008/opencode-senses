@@ -77,7 +77,7 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 - **Reverse image search without API keys** — perceptual-hash search across your local files, plus Yandex upload search, SauceNAO (anime/illustration art), and trace.moe (anime screenshots). Google Lens optional, its majesty commands it.
 - **Prompt-injection hardened** — everything the model reads from an image is wrapped in an explicit *untrusted data* guard. A screenshot screaming "ignore previous instructions" is treated as evidence, not a career move.
 - **Zero-install runtime** — auto-provisions its own Python venv + Moondream weights on first use. It even picks up its own room.
-- **Free forever** — Moondream 2 runs on your own GPU. 6 GB VRAM is plenty; that's roughly the size of a good sandwich, and it will not be sharing.
+- **Free forever** — runs on your own GPU. `moondream2` (6 GB VRAM) is the default; larger Kestrel families available for bigger cards (see Supported models).
 
 ## How it works
 
@@ -91,7 +91,7 @@ flowchart LR
     A -->|"attaches an image"| B
     B -->|"auto-inject evidence"| A
     B <-->|"stdio JSON-RPC"| C
-    C -->|"Moondream 2 via Photon/kestrel<br/>(local GPU inference)"| D
+    C -->|"Kestrel (Photon) — Moondream family<br/>(local GPU inference)"| D
     D -.->|"senses_* tools &mdash; inspect, ocr, detect, point, segment,<br/>crop, zoom, colors, diff, annotate, metadata, reverse, status"| B
     classDef opencode fill:#3f3f46,stroke:#52525b,stroke-width:2px,color:#ffffff
     classDef plugin fill:#ef4444,stroke:#7f1d1d,stroke-width:2px,color:#ffffff
@@ -105,7 +105,29 @@ flowchart LR
 
 - The **plugin** (TypeScript, runs inside the OpenCode session) spawns the Python runtime, exposes the `senses_*` tools, and auto-inspects images the moment they are attached. It is punctual because it respects you.
 - The **runtime** (`python/runtime.py`) is a line-delimited JSON-RPC server over stdio. It owns the model lifecycle: lazy load, warm cache, explicit unload. It knows when to call it a day.
-- **Vision model**: [Moondream 2](https://moondream.ai) by default — fits a 6 GB GPU comfortably (peaks at ~4.5 GB). Moondream 3.1 (9B) is supported for larger cards; check your wallet before enabling.
+- **Vision model**: [Kestrel](https://github.com/m87-labs/kestrel) (Photon engine) by default `moondream2` — fits a 6 GB GPU comfortably (peaks at ~4.5 GB). See [Supported models](#supported-models-kestrelphoton) for the full Kestrel family — Moondream 2/3/3.1 9B A2B, Qwen 3.5/3.6, Gemma 4, Whisper — pick via `SENSES_MODEL`.
+
+### Supported models (Kestrel/Photon)
+
+**Run Moondream Locally** — [Photon](https://moondream.ai/p/photon) is Moondream's high-performance local inference engine for **NVIDIA GPUs** (Linux x86_64 / aarch64 or Windows AMD64) and **Apple Silicon Macs**. It supports **Moondream, Qwen, and Gemma** models with custom CUDA and Metal kernels, automatic batching, paged KV caching, and prefix caching.
+
+**Requirements** (Photon):
+
+- One of:
+  - **NVIDIA GPU** (Ampere or newer) on Linux x86_64 / aarch64 or Windows AMD64 — see [Supported Hardware](https://moondream.ai/c/docs/running-locally#supported-hardware) for the full list.
+  - **Apple Silicon Mac** (M-series) on macOS 13 (Ventura) or later.
+- **Python** 3.10–3.14
+- **API key**: Optional for base models. A key from [moondream.ai](https://moondream.ai/c/cloud/api-keys) is required for finetuned models.
+
+Senses currently uses the **Moondream family via Kestrel/Photon** (`pip install moondream`). Kestrel supports additional families ([full list](https://github.com/m87-labs/kestrel#model-access): Qwen 3.5/3.6, Gemma 4, Whisper) but the Senses plugin wires only the vision-capable Moondream models below via `moondream.photon()` `python/runtime.py:209` (`kestrel/models/registry.py:ModelSpec` `known_models()` — weights auto-download from Hugging Face on first run):
+
+| Model | Repository | Notes |
+|---|---|---|
+| Moondream 2 | [vikhyatk/moondream2](https://huggingface.co/vikhyatk/moondream2) | Default `SENSES_MODEL=moondream2`, Apache-2.0, 6 GB |
+| Moondream 3 | [moondream/moondream3-preview](https://huggingface.co/moondream/moondream3-preview) | BSL 1.1 + Additional Use Grant |
+| Moondream 3.1 9B A2B | [moondream/moondream3.1-9B-A2B](https://huggingface.co/moondream/moondream3.1-9B-A2B) | MoE 9B total / 2B active, 32k ctx |
+
+Example: `SENSES_MODEL=moondream2` (default), `moondream/moondream3-preview`, or `moondream/moondream3.1-9B-A2B`. Kestrel handles `RuntimeConfig(model=...)` `kestrel/config.py:151` and `InferenceEngine.create()` — same Photon skills (`query`, `detect`, `point`, `caption`, `segment`). For families outside this vision set (Qwen2.5-VL, InternVL, Florence-2), a separate `VisionProvider` `src/providers/types.ts:266` would be needed.
 
 ## Requirements
 
@@ -310,7 +332,7 @@ Everything is optional. Set as environment variables or plugin options:
 
 | Env / option | Default | Description |
 |---|---|---|
-| `SENSES_MODEL` | `moondream2` | Vision model id. Large GPU? Use `moondream3.1-9B-A2B`. |
+| `SENSES_MODEL` | `moondream2` | Kestrel model id (`kestrel/models/registry.py:known_models()`). E.g. `moondream2` (6 GB), `moondream/moondream3-preview`, or `moondream/moondream3.1-9B-A2B`. See Supported models above. |
 | `SENSES_KV_CACHE_PAGES` | `4096` | KV-cache budget. Lower for small GPUs; raise for longer context. |
 | `SENSES_PYTHON` | auto (`.venv/bin/python`) | Python that has `moondream` installed. |
 | `SENSES_VENV_DIR` | `~/.cache/opencode-senses/venv` | Where the auto-provisioned venv is created. |
