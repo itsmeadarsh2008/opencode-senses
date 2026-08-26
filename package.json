@@ -1,6 +1,6 @@
 {
   "name": "opencode-senses",
-  "version": "0.2.1",
+  "version": "0.2.5",
   "description": "Vision for text-only OpenCode models. Attach a screenshot, mockup, or web URL, and the model sees it — grounded OCR, layout, object detection, colors, image diffing, and 13 senses_* tools. Fully local, private, and free.",
   "type": "module",
   "author": {
