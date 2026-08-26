@@ -48,8 +48,23 @@ export class AttachmentInjector {
   }
 
   async handle(input: ChatMessageInput, output: ChatMessageOutput): Promise<void> {
-    const images = (output.parts ?? []).filter(isImageFilePart);
-    if (images.length === 0) return;
+    // Idempotency: chat.message can fire twice for the same message (retry,
+    // session restore, or TUI optimistic update). If we already injected, skip.
+    if ((output.parts ?? []).some((p) => p.type === "text" && typeof (p as { text?: string }).text === "string" && (p as { text: string }).text.includes("<SENSES Atlas>"))) {
+      return;
+    }
+    const rawImages = (output.parts ?? []).filter(isImageFilePart);
+    if (rawImages.length === 0) return;
+    // Deduplicate identical pastes (same data URL / same file path can appear
+    // twice when the TUI replays history on session start).
+    const seenKeys = new Set<string>();
+    const images: FilePart[] = [];
+    for (const img of rawImages) {
+      const k = this.keyFor(img);
+      if (seenKeys.has(k)) continue;
+      seenKeys.add(k);
+      images.push(img);
+    }
 
     // Never block message submission on the GPU. Use cached evidence if the
     // paste-time preload already finished; otherwise kick it off and inject
