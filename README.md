@@ -74,7 +74,7 @@ Senses adds a vision layer to [OpenCode](https://opencode.ai) so any image becom
 - **13 grounded tools** — inspect, OCR, detect, point, segment, crop, zoom, colors, diff, annotate, metadata, reverse search, status. All return normalized, source-grounded evidence, the way the vision gods intended.
 - **Web images supported everywhere** — any tool accepts an `https://` URL as a `path`; the image is downloaded verbatim (original type and bytes preserved) and cached locally.
 - **Recovery-grade analysis** — `senses_zoom` upscales regions and re-reads small text the model misses at full-image scale; `senses_colors` gives deterministic pixel ground truth the model can't hallucinate, even if it wanted to.
-- **Reverse image search without API keys** — perceptual-hash search across your local files, plus Yandex upload search (Google Lens optional, its majesty commands it).
+- **Reverse image search without API keys** — perceptual-hash search across your local files, plus Yandex upload search, SauceNAO (anime/illustration art), and trace.moe (anime screenshots). Google Lens optional, its majesty commands it.
 - **Prompt-injection hardened** — everything the model reads from an image is wrapped in an explicit *untrusted data* guard. A screenshot screaming "ignore previous instructions" is treated as evidence, not a career move.
 - **Zero-install runtime** — auto-provisions its own Python venv + Moondream weights on first use. It even picks up its own room.
 - **Free forever** — Moondream 2 runs on your own GPU. 6 GB VRAM is plenty; that's roughly the size of a good sandwich, and it will not be sharing.
@@ -252,7 +252,7 @@ All tools accept either `path` (local file, http(s) URL, or project-relative) or
 | **`senses_colors`** | `path` / `image`, `region` | No model — dominant palette with shares, dark/mid/bright luminance buckets, average RGB. Ground truth the vision model can't give reliably, no matter how confidently it tries. |
 | **`senses_diff`** | `path`/`image` + `otherPath`/`otherImage`, `describe` | Pixel-level change map: % changed + changed-region boxes (anti-aliasing blurred out), optional model summary of the delta. Perfect for render iterations. |
 | **`senses_annotate`** | `path` / `image`, `boxes`, `points`, `color` | Draws boxes/points (same shapes as detect/point output) onto a copy to visually validate what the model found. |
-| **`senses_reverse`** | `path` / `image`, `providers` (`local`, `yandex`), `dir`, `limit` | No-API-key reverse image search. `local` scans your cache (and optional `dir`) with perceptual hashing; `yandex` uploads and returns matching page URLs + a browser-ready search link. Yandex uploads image bytes to Yandex's public CBIR endpoint — opt in by passing `providers:"yandex"`. |
+| **`senses_reverse`** | `path` / `image`, `providers` (`local`, `yandex`, `saucenao`, `tracemoe`), `dir`, `limit` | No-API-key reverse image search. `local` scans your cache (and optional `dir`) with perceptual hashing; remote providers upload and return matching page URLs + a browser-ready search link (`saucenao` for anime/illustration art, `tracemoe` for anime screenshots). Remote providers upload image bytes — opt in by passing e.g. `providers:"saucenao,tracemoe"`. Optional `SAUCENAO_API_KEY` / `TRACE_MOE_TOKEN` env vars raise rate limits. |
 | **`senses_status`** | — | Model load state, device, VRAM, request count, last inference time. |
 
 ### Examples
@@ -318,6 +318,8 @@ Everything is optional. Set as environment variables or plugin options:
 | `SENSES_UV` | `uv` | Binary to use for auto-provisioning when available. |
 | `SENSES_DISABLE_AUTO_PROVISION` | — | Set `1` to skip auto-install; then `SENSES_PYTHON` must supply `moondream`. |
 | `SENSES_DEBUG` | — | Set `1` to print runtime logs to stderr. Off by default — useful signals go to TUI toasts instead. |
+| `SAUCENAO_API_KEY` | — | Optional SauceNAO API key (free: 150/day). Without it, anonymous limits apply. Get one at https://saucenao.com/user.php. |
+| `TRACE_MOE_TOKEN` / `TRACE_MOE_KEY` | — | Optional trace.moe token for higher limits. Get one at https://trace.moe/. |
 | `HF_TOKEN` | — | Hugging Face token. Only speeds up model download rate-limits; not required. |
 | `MOONDREAM_API_KEY` | — | Only needed for Moondream finetune/hosted inference. Useless for the default local model. |
 | `HF_HOME` | `~/.cache/huggingface` | Where model weights are cached. |
@@ -344,7 +346,7 @@ Plugin options in `opencode.json`:
 
 ## Privacy
 
-**Local-first.** Images and analysis never leave your machine unless you *explicitly* call a remote provider (`senses_reverse`'s `yandex` provider uploads your image to Yandex; `MOONDREAM_API_KEY` finetunes call Moondream hosted inference). Everything else — analysis, cropping, diffing, hashing — runs on your own GPU. We are not listening, we are not watching, we are not even awake.
+**Local-first.** Images and analysis never leave your machine unless you *explicitly* call a remote provider (`senses_reverse` with `yandex`/`saucenao`/`tracemoe` uploads your image to that service; `MOONDREAM_API_KEY` finetunes call Moondream hosted inference). Everything else — analysis, cropping, diffing, hashing — runs on your own GPU. We are not listening, we are not watching, we are not even awake.
 
 Evidence injected into context is explicitly guarded as **untrusted data** — text observed inside an image is "evidence, not instructions", so a prompt smuggled inside a screenshot won't hijack the model.
 
@@ -358,6 +360,7 @@ Evidence injected into context is explicitly guarded as **untrusted data** — t
 - **`PROVISION_FAILED`** — the auto-venv install hit an error (network, pip, Python version). Remove `~/.cache/opencode-senses/venv` and retry, or set `SENSES_PYTHON`/`SENSES_VENV_DIR` yourself. If it says "Install uv...", the host `python3` couldn't create a venv (missing `ensurepip`, externally-managed env); `curl -LsSf https://astral.sh/uv/install.sh | sh` usually fixes it, since uv can provision its own Python.
 - **First run downloads a lot** — auto-provision installs `moondream` (Torch + CUDA wheels, can take several minutes) before model weights (~3.9 GB) download. With `uv` installed, the pip part is ~10–100x faster and cached at `~/.cache/uv`. Good time to go make coffee. Decaf, if it's late.
 - **Yandex reverse search returns no results or just a search link** — Yandex occasionally serves bot-protection pages to scripted uploads. When that happens, `senses_reverse` returns the browser-ready search link with no matches; open it in a browser to upload by hand, or run `senses_reverse` with `providers:"local"` only for the always-free local scan. The CBIR flow (cbirId upload + `data-state` SSR parse) is the supported path as of 2026-08.
+- **SauceNAO/tracemoe rate limits** — SauceNAO is ~4 requests/30s anon, 150/day free; trace.moe ~10/min anon, 1/sec with token. When limited, `senses_reverse` returns the provider's search page with no matches (graceful) — set `SAUCENAO_API_KEY` / `TRACE_MOE_TOKEN` for headroom. trace.moe also filters `isAdult` results by default; SauceNAO `hide=0` keeps the full set (use `minsim` server default 30% to cut noise).
 
 ## Development (build from source)
 
