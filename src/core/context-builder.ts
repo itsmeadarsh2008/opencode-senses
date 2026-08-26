@@ -216,13 +216,18 @@ export class ContextBuilder {  renderHealth(health: VisionHealth): string {
         }
       } else {
         if (r.matches.length === 0) {
-          lines.push("yandex: no results");
+          lines.push(`${r.provider}: no results`);
         } else {
           lines.push(
-            `yandex: ${r.matches.map((m) => m.title ?? m.url ?? "?").join(" | ")}`,
+            `${r.provider}: ${r.matches
+              .map((m) => {
+                const base = m.title ?? m.url ?? "?";
+                return m.similarity != null ? `${base} (${(m.similarity * 100).toFixed(1)}%)` : base;
+              })
+              .join(" | ")}`,
           );
         }
-        lines.push(`yandex search page: ${r.searchUrl}`);
+        lines.push(`${r.provider} search page: ${r.searchUrl}`);
       }
     }
     return this.wrap(lines.join("\n"), "Reverse");

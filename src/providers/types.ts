@@ -205,15 +205,18 @@ export interface ReverseSearchRequest {
   limit?: number;
 }
 
+export interface RemoteReverseMatch {
+  url: string | null;
+  title: string | null;
+  /** 0–1, when the provider exposes a confidence. */
+  similarity?: number;
+}
+
 export interface ReverseSearchResult {
   query: string;
   results: Array<
     | { provider: "local"; matches: Array<{ path: string; similarity: number }>; scanned: number }
-    | {
-        provider: "yandex";
-        searchUrl: string;
-        matches: Array<{ url: string | null; title: string | null }>;
-      }
+    | { provider: "yandex" | "saucenao" | "tracemoe"; searchUrl: string; matches: RemoteReverseMatch[] }
   >;
 }
 

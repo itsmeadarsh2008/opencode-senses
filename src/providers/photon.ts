@@ -414,14 +414,16 @@ export class PhotonProvider implements VisionProvider {
       query?: string;
       results?: Array<Record<string, unknown>>;
     };
+    const REMOTE = new Set(["yandex", "saucenao", "tracemoe"]);
     const results = (res["results"] ?? []).map((r) => {
-      if (r["provider"] === "yandex") {
+      if (typeof r["provider"] === "string" && REMOTE.has(r["provider"] as string)) {
         return {
-          provider: "yandex" as const,
+          provider: r["provider"] as "yandex" | "saucenao" | "tracemoe",
           searchUrl: str(r["search_url"]),
           matches: ((r["matches"] as Array<Record<string, unknown>>) ?? []).map((m) => ({
             url: m["url"] == null ? null : str(m["url"]),
             title: m["title"] == null ? null : str(m["title"]),
+            ...(m["similarity"] == null ? {} : { similarity: num(m["similarity"]) }),
           })),
         };
       }

@@ -373,14 +373,16 @@ export function sensesTools(
 
     "senses_reverse": tool({
       description:
-        "Reverse image search with no API key. 'local' perceptual-hash search finds near-duplicates in your cache and optional 'dir' (always available); 'yandex' uploads to Yandex image search and returns matching page URLs. Default providers: local,yandex.",
+        "Reverse image search. 'local' perceptual-hash search finds near-duplicates in your cache and optional 'dir' (always available, no upload). Remote providers upload the image: 'yandex' (general web), 'saucenao' (anime/illustration art, optional SAUCENAO_API_KEY), 'tracemoe' (anime screenshots, optional TRACE_MOE_TOKEN). Default providers: local,yandex.",
       args: {
         path: tool.schema.string().optional().describe("Path or http(s) URL of the image file."),
         image: tool.schema.string().optional().describe("Image as a base64 data URL."),
         providers: tool.schema
           .string()
           .optional()
-          .describe("Comma-separated: 'local', 'yandex' (default 'local,yandex')."),
+          .describe(
+            "Comma-separated: 'local', 'yandex', 'saucenao', 'tracemoe' (default 'local,yandex'). Remote providers upload the image when explicitly requested.",
+          ),
         dir: tool.schema
           .string()
           .optional()
