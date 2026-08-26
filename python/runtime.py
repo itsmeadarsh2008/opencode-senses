@@ -35,7 +35,8 @@ Methods
 * diff      -> pixel-level change map between two images
 * annotate  -> draw boxes/points onto a copy (no model)
 * hash_search -> local perceptual-hash reverse search (no model)
-* reverse   -> reverse image search: local + Yandex (no API key)
+* reverse   -> reverse image search: local + Yandex + SauceNAO + trace.moe
+               (remote providers upload the image; optional API-key env vars)
 * shutdown  -> exit(0)
 
 source := {"type": "path", "path": str} | {"type": "data", "data": dataUrl}
@@ -857,29 +858,36 @@ _YANDEX_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 )
+_SAUCENAO_ENDPOINT = "https://saucenao.com/search.php"
+_TRACEMOE_ENDPOINT = "https://api.trace.moe/search"
 # Cap how many matches we surface — Yandex often returns 100+ site entries;
 # the first handful are the highest-ranked and most useful.
 _YANDEX_MAX_MATCHES = 8
+_SAUCENAO_MAX_MATCHES = 8
+_TRACEMOE_MAX_MATCHES = 5
+
+
+def _multipart_form(
+    field: str, filename: str, mime: str, payload: bytes
+) -> tuple[bytes, str]:
+    """Build a multipart/form-data body with a single file field."""
+    boundary = "----SensesBoundary" + secrets.token_hex(8)
+    out = io.BytesIO()
+    out.write(f"--{boundary}\r\n".encode())
+    out.write(
+        f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+        f"Content-Type: {mime}\r\n\r\n".encode()
+    )
+    out.write(payload)
+    out.write(f"\r\n--{boundary}--\r\n".encode())
+    return out.getvalue(), boundary
 
 
 def _yandex_multipart(
     image_bytes: bytes, filename: str, mime: str
 ) -> tuple[bytes, str]:
-    """Build a multipart/form-data body with a single `upfile` field.
-
-    Returns the bytes and the boundary string used (so callers can set the
-    `Content-Type: multipart/form-data; boundary=...` header correctly).
-    """
-    boundary = "----SensesBoundary" + secrets.token_hex(8)
-    out = io.BytesIO()
-    out.write(f"--{boundary}\r\n".encode())
-    out.write(
-        f'Content-Disposition: form-data; name="upfile"; filename="{filename}"\r\n'
-        f"Content-Type: {mime}\r\n\r\n".encode()
-    )
-    out.write(image_bytes)
-    out.write(f"\r\n--{boundary}--\r\n".encode())
-    return out.getvalue(), boundary
+    """Back-compat wrapper — delegates to _multipart_form with field='upfile'."""
+    return _multipart_form("upfile", filename, mime, image_bytes)
 
 
 def _yandex_parse_sites(html_text: str) -> list[dict]:
@@ -1078,6 +1086,390 @@ def _yandex_reverse(image_path: str) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# SauceNAO — illustration / anime art search (best for fan art, Pixiv, etc.)
+# ---------------------------------------------------------------------------
+
+
+def _saucenao_pick_title(data: dict) -> str | None:
+    for key in ("title", "material", "jp_name", "eng_name", "source", "created_at"):
+        v = data.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def _saucenao_pick_author(data: dict) -> str | None:
+    for key in ("member_name", "author_name", "creator", "author"):
+        v = data.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        if isinstance(v, list) and v:
+            first = str(v[0]).strip()
+            if first:
+                return first
+    return None
+
+
+def _saucenao_pick_url(data: dict) -> str | None:
+    # Prefer canonical per-platform URLs when a platform id is present.
+    pixiv_id = data.get("pixiv_id")
+    if isinstance(pixiv_id, int) or (
+        isinstance(pixiv_id, str) and str(pixiv_id).isdigit()
+    ):
+        return f"https://www.pixiv.net/artworks/{pixiv_id}"
+    pawoo_id = data.get("pawoo_id")
+    pawoo_acct = data.get("pawoo_user_acct")
+    if pawoo_id is not None and pawoo_acct:
+        return f"https://pawoo.net/@{pawoo_acct}/{pawoo_id}"
+    getchu_id = data.get("getchu_id")
+    if getchu_id:
+        return f"https://www.getchu.com/soft.phtml?id={getchu_id}"
+    ext = data.get("ext_urls")
+    if isinstance(ext, list) and ext:
+        first = ext[0]
+        if isinstance(first, str) and first.strip():
+            return first.strip()
+    url = data.get("url")
+    if isinstance(url, str) and url.strip():
+        return url.strip()
+    return None
+
+
+def _saucenao_parse(payload: dict) -> list[dict]:
+    """Normalize a SauceNAO JSON payload into remote matches.
+
+    Input `payload` is the parsed JSON body from /search.php with
+    output_type=2 (header + results[]). Output matches carry url/title
+    plus optional similarity 0-1 and source tag for rendering.
+    """
+    out: list[dict] = []
+    results = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(results, list):
+        return out
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        header = item.get("header") if isinstance(item.get("header"), dict) else {}
+        data = item.get("data") if isinstance(item.get("data"), dict) else {}
+        # similarity comes back as a string like "93.64" (0-100).
+        sim: float | None = None
+        raw_sim = header.get("similarity") if isinstance(header, dict) else None
+        if isinstance(raw_sim, (int, float)):
+            sim = float(raw_sim) / 100.0
+        elif isinstance(raw_sim, str):
+            try:
+                sim = float(raw_sim.strip()) / 100.0
+            except ValueError:
+                sim = None
+        if sim is not None:
+            sim = max(0.0, min(1.0, sim))
+        title = _saucenao_pick_title(data)
+        author = _saucenao_pick_author(data)
+        if title and author:
+            title = f"{title} — {author}"
+        elif author and not title:
+            title = author
+        url = _saucenao_pick_url(data)
+        if not url:
+            continue
+        m: dict = {
+            "url": url,
+            "source": "saucenao",
+            "title": (title[:140] if title else None),
+        }
+        if sim is not None:
+            m["similarity"] = round(sim, 4)
+        out.append(m)
+        if len(out) >= _SAUCENAO_MAX_MATCHES:
+            break
+    return out
+
+
+def _saucenao_reverse(image_path: str) -> dict:
+    """Reverse-search an image via SauceNAO (best for illustrations/anime art).
+
+    Uses POST multipart with field `file`. Honors env `SAUCENAO_API_KEY` if set.
+    Returns graceful empty+landing on rate-limit/captcha (HTTP 429/403 or
+    payload with header.status != 0 and empty results).
+    """
+    with open(image_path, "rb") as fh:
+        image_bytes = fh.read()
+    ext = os.path.splitext(image_path)[1].lower().lstrip(".") or "jpg"
+    mime = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "gif": "image/gif",
+        "bmp": "image/bmp",
+        "avif": "image/avif",
+        "heic": "image/heic",
+    }.get(ext, "application/octet-stream")
+
+    params = {
+        "output_type": "2",
+        "numres": str(_SAUCENAO_MAX_MATCHES),
+        "db": "999",
+        "hide": "0",
+        "minsim": "30",
+    }
+    api_key = os.environ.get("SAUCENAO_API_KEY", "").strip()
+    if api_key:
+        params["api_key"] = api_key
+    qs = urllib.parse.urlencode(params)
+    url = _SAUCENAO_ENDPOINT + "?" + qs
+    body, boundary = _multipart_form("file", f"image.{ext}", mime, image_bytes)
+
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+    opener.addheaders = [("User-Agent", _YANDEX_UA), ("Accept", "application/json")]
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+        with opener.open(req, timeout=40) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        # SauceNAO surfaces rate-limits as 429 (and sometimes 403 on bad key).
+        if exc.code in (429, 403):
+            return {
+                "provider": "saucenao",
+                "search_url": "https://saucenao.com/",
+                "matches": [],
+            }
+        raise ValueError(f"SauceNAO search failed (HTTP {exc.code}): {exc.reason}")
+    except Exception as exc:
+        raise ValueError(f"SauceNAO search failed ({exc})")
+
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        # HTML captcha or garbled response — graceful fallback.
+        return {
+            "provider": "saucenao",
+            "search_url": "https://saucenao.com/",
+            "matches": [],
+        }
+
+    # SauceNAO header.status: 0 = OK; negative = warning/rate-limit variant.
+    header = payload.get("header") if isinstance(payload, dict) else None
+    if isinstance(header, dict):
+        status = header.get("status")
+        # Non-zero with empty results -> still surface landing, not a hard error.
+        if status not in (0, None) and not payload.get("results"):
+            return {
+                "provider": "saucenao",
+                "search_url": "https://saucenao.com/",
+                "matches": [],
+            }
+
+    matches = _saucenao_parse(payload)
+
+    # Build a browser-ready search page URL when SauceNAO gives us
+    # query_image_display (path fragment to the cached upload), e.g.
+    # "/res/saucenao/abc123.jpg" -> https://saucenao.com/search.php?url=https://saucenao.com/res/...
+    search_url = "https://saucenao.com/"
+    if isinstance(header, dict):
+        qid = header.get("query_image_display")
+        if isinstance(qid, str) and qid.strip():
+            base = "https://saucenao.com" + (
+                qid if qid.startswith("/") else "/" + qid.strip()
+            )
+            search_url = "https://saucenao.com/search.php?url=" + urllib.parse.quote(
+                base, safe=""
+            )
+
+    return {"provider": "saucenao", "search_url": search_url, "matches": matches}
+
+
+# ---------------------------------------------------------------------------
+# trace.moe — anime screenshot search
+# ---------------------------------------------------------------------------
+
+
+def _tracemoe_title(anilist: dict) -> str | None:
+    title = anilist.get("title") if isinstance(anilist.get("title"), dict) else None
+    if isinstance(title, dict):
+        for k in ("english", "romaji", "native"):
+            v = title.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+    # Fallback to top-level synonym/material-like fields.
+    for k in ("synonyms",):
+        v = anilist.get(k)
+        if isinstance(v, list) and v and isinstance(v[0], str) and v[0].strip():
+            return v[0].strip()
+    return None
+
+
+def _tracemoe_parse(payload: dict) -> list[dict]:
+    """Normalize trace.moe JSON payload into remote matches.
+
+    Filters out isAdult entries by default; surfaces similarity as 0-1 and a
+    compact title like "Fruits Basket 2nd Season · E18".
+    """
+    out: list[dict] = []
+    results = payload.get("result") if isinstance(payload, dict) else None
+    if not isinstance(results, list):
+        return out
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        al = item.get("anilist") if isinstance(item.get("anilist"), dict) else {}
+        if al.get("isAdult") is True:
+            continue
+        title = _tracemoe_title(al)  # type: ignore[arg-type]
+        episode = item.get("episode")
+        if isinstance(episode, int):
+            title = f"{title} · E{episode}" if title else f"E{episode}"
+        elif isinstance(episode, str) and episode.strip():
+            title = f"{title} · {episode.strip()}" if title else episode.strip()
+        url = al.get("siteUrl") if isinstance(al.get("siteUrl"), str) else None
+        if not url:
+            aid = al.get("id") if isinstance(al.get("id"), int) else None
+            if aid is not None:
+                url = f"https://anilist.co/anime/{aid}"
+        if not url:
+            continue
+        sim = item.get("similarity")
+        m: dict = {
+            "url": url,
+            "source": "tracemoe",
+            "title": (title[:140] if title else None),
+        }
+        if isinstance(sim, (int, float)):
+            m["similarity"] = round(max(0.0, min(1.0, float(sim))), 4)
+        out.append(m)
+        if len(out) >= _TRACEMOE_MAX_MATCHES:
+            break
+    return out
+
+
+def _tracemoe_maybe_shrink(
+    path: str, raw: bytes, limit: int = 8 * 1024 * 1024
+) -> tuple[bytes, str]:
+    """If raw image bytes exceed trace.moe's practical upload limit, downscale.
+
+    Keeps original encoding when under limit; otherwise re-encodes via PIL.
+    Returns (bytes_to_send, ext).
+    """
+    if len(raw) <= limit:
+        return raw, os.path.splitext(path)[1].lower().lstrip(".") or "jpg"
+    try:
+        im = Image.open(io.BytesIO(raw))
+        im = im.convert("RGB")
+        # Shrink progressively — trace.moe docs recommend ~800px on the short side.
+        im.thumbnail((1280, 1280), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=85, optimize=True)
+        shrunk = buf.getvalue()
+        if len(shrunk) <= limit:
+            return shrunk, "jpg"
+        # One more pass
+        im.thumbnail((800, 800), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=80, optimize=True)
+        shrunk = buf.getvalue()
+        return shrunk, "jpg"
+    except Exception:
+        return raw, os.path.splitext(path)[1].lower().lstrip(".") or "jpg"
+
+
+def _tracemoe_reverse(image_path: str) -> dict:
+    """Reverse-search an image via trace.moe (anime screenshots).
+
+    POSTs multipart field `image` to /search?cutBorders&anilistInfo. Optional
+    token via env TRACE_MOE_TOKEN / TRACE_MOE_KEY. Gracefully handles rate
+    limits (429) and non-scene images (low similarity).
+    """
+    with open(image_path, "rb") as fh:
+        raw = fh.read()
+    payload_bytes, ext = _tracemoe_maybe_shrink(image_path, raw)
+    mime = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "gif": "image/gif",
+        "bmp": "image/bmp",
+    }.get(ext, "image/jpeg")
+
+    qs: dict[str, str] = {"cutBorders": "", "anilistInfo": ""}
+    token = (
+        os.environ.get("TRACE_MOE_TOKEN") or os.environ.get("TRACE_MOE_KEY") or ""
+    ).strip()
+    if token:
+        qs["key"] = token
+    query = urllib.parse.urlencode(qs)
+    url = _TRACEMOE_ENDPOINT + ("?" + query if query else "")
+    body, boundary = _multipart_form("image", f"image.{ext}", mime, payload_bytes)
+
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+    opener.addheaders = [("User-Agent", _YANDEX_UA), ("Accept", "application/json")]
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+        with opener.open(req, timeout=40) as resp:
+            raw_text = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        if exc.code in (429, 402):
+            return {
+                "provider": "tracemoe",
+                "search_url": "https://trace.moe/",
+                "matches": [],
+            }
+        # Attempt to read body for a structured error even on HTTPError.
+        try:
+            raw_text = exc.read().decode("utf-8", "replace")  # type: ignore[union-attr]
+            payload = json.loads(raw_text)
+            if payload.get("error"):
+                return {
+                    "provider": "tracemoe",
+                    "search_url": "https://trace.moe/",
+                    "matches": [],
+                }
+        except Exception:
+            pass
+        raise ValueError(f"trace.moe search failed (HTTP {exc.code}): {exc.reason}")
+    except Exception as exc:
+        raise ValueError(f"trace.moe search failed ({exc})")
+
+    try:
+        payload = json.loads(raw_text)
+    except ValueError:
+        return {
+            "provider": "tracemoe",
+            "search_url": "https://trace.moe/",
+            "matches": [],
+        }
+
+    if isinstance(payload, dict) and payload.get("error"):
+        # trace.moe puts rate-limit/quota text in `error` while still 200.
+        err = str(payload.get("error") or "").lower()
+        if any(k in err for k in ("limit", "quota", "too many", "rate")):
+            return {
+                "provider": "tracemoe",
+                "search_url": "https://trace.moe/",
+                "matches": [],
+            }
+
+    matches = _tracemoe_parse(payload if isinstance(payload, dict) else {})
+    return {
+        "provider": "tracemoe",
+        "search_url": "https://trace.moe/",
+        "matches": matches,
+    }
+
+
 def handle_reverse(params: dict) -> dict:
     source = params["source"]
     providers = [
@@ -1103,12 +1495,20 @@ def handle_reverse(params: dict) -> dict:
                 "scanned": local_res["scanned"],
             }
         )
-    if "yandex" in providers:
+    # Remote CBIR providers — require a file path (upload the image).
+    remote = [p for p in providers if p in {"yandex", "saucenao", "tracemoe"}]
+    if remote:
         if source.get("type") != "path":
             raise ValueError(
-                "yandex reverse search requires a file path (upload the file first)"
+                f"remote reverse search ({','.join(remote)}) requires a file path (upload the file first)"
             )
-        out["results"].append(_yandex_reverse(source["path"]))
+        for p in providers:
+            if p == "yandex":
+                out["results"].append(_yandex_reverse(source["path"]))
+            elif p == "saucenao":
+                out["results"].append(_saucenao_reverse(source["path"]))
+            elif p == "tracemoe":
+                out["results"].append(_tracemoe_reverse(source["path"]))
     return {"result": out}
 
 
