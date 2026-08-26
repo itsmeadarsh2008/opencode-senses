@@ -276,3 +276,101 @@ print(json.dumps(rt._yandex_parse_sites(sys.stdin.read())))
     expect(parse("<html><body>no state here</body></html>")).toEqual([]);
   });
 });
+
+describe("saucenao parser", () => {
+  function parse(payload: unknown): { url: string | null; title: string | null; source: string; similarity?: number }[] {
+    const r = spawnSync(VENV_PYTHON, ["-c", `
+import json, sys, importlib.util
+spec = importlib.util.spec_from_file_location("rt", ${JSON.stringify(RUNTIME)})
+rt = importlib.util.module_from_spec(spec); spec.loader.exec_module(rt)
+payload = json.loads(sys.stdin.read())
+print(json.dumps(rt._saucenao_parse(payload)))
+`], { input: JSON.stringify(payload), encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`parser exited ${r.status}: ${r.stderr}`);
+    return JSON.parse(r.stdout);
+  }
+
+  it("normalizes pixiv_id, string similarity, and author into title", () => {
+    const payload = {
+      header: { short_remaining: 3, long_remaining: 99, results_returned: 1 },
+      results: [
+        {
+          header: { similarity: "93.64502", thumbnail: "https://thumb", index_id: 5, index_name: "pixiv" },
+          data: { ext_urls: ["https://www.pixiv.net/member_illust.php?mode=medium&illust_id=777"], title: "Megumin", member_name: "frgs", pixiv_id: 777 },
+        },
+      ],
+    };
+    const m = parse(payload);
+    expect(m.length).toBe(1);
+    expect(m[0].url).toBe("https://www.pixiv.net/artworks/777");
+    expect(m[0].title).toBe("Megumin — frgs");
+    expect(m[0].source).toBe("saucenao");
+    expect(m[0].similarity).toBeCloseTo(0.9365, 3);
+  });
+
+  it("falls back through title/material/jp_name and ext_urls", () => {
+    const payload = {
+      header: {}, results: [
+        { header: { similarity: "71.2" }, data: { material: "Some Material", ext_urls: ["https://example.org/a"], source: "Anime X" } },
+        { header: { similarity: 55 }, data: { jp_name: "日本語名", ext_urls: ["https://example.org/b"] } },
+      ],
+    };
+    const m = parse(payload);
+    expect(m.length).toBe(2);
+    expect(m[0].title).toBe("Some Material");
+    expect(m[0].url).toBe("https://example.org/a");
+    expect(m[0].similarity).toBeCloseTo(0.712, 3);
+    expect(m[1].title).toBe("日本語名");
+  });
+
+  it("skips entries with no url and caps by provider max", () => {
+    const payload = { header: {}, results: [{ header: {}, data: { title: "No URL" } }] };
+    expect(parse(payload).length).toBe(0);
+  });
+
+  it("returns empty on missing results array", () => {
+    expect(parse({ header: {} })).toEqual([]);
+    expect(parse({})).toEqual([]);
+  });
+});
+
+describe("tracemoe parser", () => {
+  function parse(payload: unknown): { url: string | null; title: string | null; source: string; similarity?: number }[] {
+    const r = spawnSync(VENV_PYTHON, ["-c", `
+import json, sys, importlib.util
+spec = importlib.util.spec_from_file_location("rt", ${JSON.stringify(RUNTIME)})
+rt = importlib.util.module_from_spec(spec); spec.loader.exec_module(rt)
+payload = json.loads(sys.stdin.read())
+print(json.dumps(rt._tracemoe_parse(payload)))
+`], { input: JSON.stringify(payload), encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`parser exited ${r.status}: ${r.stderr}`);
+    return JSON.parse(r.stdout);
+  }
+
+  it("maps anilist title english + episode and siteUrl, filters isAdult", () => {
+    const payload = {
+      frameCount: 1, error: "", result: [
+        { anilist: { id: 111762, siteUrl: "https://anilist.co/anime/111762", title: { english: "Fruits Basket 2nd Season", romaji: "Furuba", native: "フルバスケ" }, isAdult: false }, filename: "Ep18.mp4", episode: 18, from: 638.4, to: 638.5, similarity: 0.861234, video: "https://v", image: "https://i" },
+        { anilist: { id: 999, title: { romaji: "Hentai Thing" }, isAdult: true }, filename: "x.mp4", similarity: 0.99 },
+      ],
+    };
+    const m = parse(payload);
+    expect(m.length).toBe(1);
+    expect(m[0].url).toBe("https://anilist.co/anime/111762");
+    expect(m[0].title).toBe("Fruits Basket 2nd Season · E18");
+    expect(m[0].source).toBe("tracemoe");
+    expect(m[0].similarity).toBeCloseTo(0.8612, 4);
+  });
+
+  it("falls back to romaji/native and synthesizes anilist url from id", () => {
+    const payload = { result: [{ anilist: { id: 42, title: { romaji: "My Romaji", native: "日本語" } }, similarity: 0.5 }] };
+    const m = parse(payload);
+    expect(m[0].title).toBe("My Romaji");
+    expect(m[0].url).toBe("https://anilist.co/anime/42");
+  });
+
+  it("returns empty when result is missing or all adult", () => {
+    expect(parse({})).toEqual([]);
+    expect(parse({ result: [{ anilist: { isAdult: true }, similarity: 0.9 }] })).toEqual([]);
+  });
+});
