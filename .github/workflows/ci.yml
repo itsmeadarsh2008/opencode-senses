@@ -27,7 +27,7 @@ jobs:
         run: bun run typecheck
 
       - name: Unit tests (GPU-free)
-        run: bun test src/providers/photon.test.ts
+        run: bun test
 
       - name: Build
         run: bun run build
