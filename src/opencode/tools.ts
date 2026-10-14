@@ -410,6 +410,521 @@ export function sensesTools(
   } as const;
 }
 
+/**
+ * V2 tool definition for `ctx.tool.transform(editor => editor.add(def))`.
+ *
+ * V1 builds tools with the `tool()` helper (zod args, plain-string results).
+ * V2 registers the same capabilities with JSON Schema `input` and structured
+ * `{ content }` results. The vision logic is identical — only the envelope
+ * differs — so both generations stay in sync through the shared helpers above.
+ */
+export interface SensesToolDef {
+  name: string;
+  description: string;
+  input: {
+    type: "object";
+    properties: Record<string, unknown>;
+    required?: string[];
+    additionalProperties: false;
+  };
+  execute: (input: Record<string, any>) => Promise<{ content: string }>;
+}
+
+const PATH_PROP = {
+  type: "string",
+  description: "Path to the image file, relative to the current project.",
+} as const;
+
+const PATH_URL_PROP = {
+  type: "string",
+  description: "Path or http(s) URL of the image file.",
+} as const;
+
+const IMAGE_PROP = {
+  type: "string",
+  description: "Image as a base64 data URL (data:image/...;base64,...).",
+} as const;
+
+const REGION_PROP = {
+  type: "string",
+  description: "Optional normalized [x1, y1, x2, y2] comma-separated.",
+} as const;
+
+type ToolArgs = {
+  path?: string;
+  image?: string;
+  question?: string;
+  target?: string;
+  kind?: "all" | "code" | "error";
+  bbox?: string;
+  region?: string;
+  scale?: number;
+  analyze?: "none" | "ocr" | "caption" | "query";
+  otherPath?: string;
+  otherImage?: string;
+  describe?: boolean;
+  boxes?: string;
+  points?: string;
+  color?: string;
+  label?: string;
+  providers?: string;
+  dir?: string;
+  limit?: number;
+};
+
+export function sensesToolDefs(
+  provider: () => PhotonProvider,
+  opts: { reverseSearch?: "auto" | "always" } = {},
+): SensesToolDef[] {
+  const reverseAlways = opts.reverseSearch === "always";
+
+  return [
+    {
+      name: "senses_inspect",
+      description:
+        "Inspect an image with the Senses vision model. Use for screenshots, attached media, or design mockups. If 'question' is given, answers it; otherwise returns a structured scene read (image type, layout, elements, state) plus a caption and exact OCR of any visible text. Returns structured evidence in <SENSES> tags.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_PROP,
+          image: IMAGE_PROP,
+          question: {
+            type: "string",
+            description: "Natural-language question about the image.",
+          },
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const label = sourceLabel(args);
+          if (args.question) {
+            const res = await provider().query({ source: src, question: args.question });
+            return { content: contextBuilder.renderQuery(res, { source: label, question: args.question }) };
+          }
+          const [cap, scene, ocr, localMatch] = await Promise.all([
+            provider().caption({ source: src }),
+            provider().scene({ source: src }),
+            provider().ocr({ source: src }),
+            reverseAlways
+              ? provider()
+                  .hashSearch({ source: src })
+                  .then((r) => (r.matches.length ? r : null))
+                  .catch(() => null)
+              : Promise.resolve(null),
+          ]);
+          const parts = [
+            contextBuilder.renderScene(scene, { source: label }),
+            contextBuilder.renderCaption(cap, { source: label }),
+            contextBuilder.renderOCR(ocr, { source: label }),
+          ];
+          if (localMatch) {
+            parts.push(
+              contextBuilder.renderReverse({
+                query: label,
+                results: [
+                  {
+                    provider: "local",
+                    matches: localMatch.matches.map((m) => ({
+                      path: m.path,
+                      similarity: m.similarity,
+                    })),
+                    scanned: localMatch.scanned,
+                  },
+                ],
+              }),
+            );
+          }
+          return { content: parts.join("\n") };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_detect",
+      description:
+        "Detect objects or UI elements in an image and return their labeled bounding boxes (e.g. 'submit button', 'navbar', 'broken element').",
+      input: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path to the image file." },
+          image: IMAGE_PROP,
+          target: { type: "string", description: "The object or UI element to search for." },
+        },
+        required: ["target"],
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().detect({ source: src, target: args.target as string });
+          return {
+            content: contextBuilder.renderDetection(res, {
+              source: sourceLabel(args),
+              title: `Detect:${args.target}`,
+            }),
+          };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_point",
+      description:
+        "Locate the exact on-screen position of a target in an image. Returns normalized point coordinates (0-1) identifying where the target sits.",
+      input: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path of the image file." },
+          image: IMAGE_PROP,
+          target: { type: "string", description: "The object or element to locate." },
+        },
+        required: ["target"],
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().point({ source: src, target: args.target as string });
+          return { content: contextBuilder.renderPoint(res, { source: sourceLabel(args) }) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_ocr",
+      description:
+        "Extract exact text from an image. Prefer this over a caption when the precise wording of an error message, code, label, or page text matters.",
+      input: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path of the image file." },
+          image: IMAGE_PROP,
+          kind: {
+            type: "string",
+            enum: ["all", "code", "error"],
+            description: "'all' transcribes everything; 'code' targets code text; 'error' targets error messages.",
+          },
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const kindArg = args.kind ?? "all";
+          const res = await provider().ocr({ source: src, kind: kindArg });
+          return { content: contextBuilder.renderOCR(res, { source: sourceLabel(args) }) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_status",
+      description:
+        "Report the Senses vision runtime status: model load state, device, VRAM usage, request count, last inference time.",
+      input: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+      execute: async () => {
+        try {
+          const health: VisionHealth = await provider().health();
+          return { content: contextBuilder.renderHealth(health) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_segment",
+      description:
+        "Cut out an object or UI element from an image. Returns the path to a saved mask/PNG plus its bounding box. Use when you need a clean region of an image (logo, button, person, chart element) rather than just coordinates.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_URL_PROP,
+          image: IMAGE_PROP,
+          target: { type: "string", description: "The object or element to segment." },
+        },
+        required: ["target"],
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().segment({ source: src, target: args.target as string });
+          return {
+            content: contextBuilder.renderSegment(res, {
+              source: sourceLabel(args),
+              title: `Segment:${args.target}`,
+            }),
+          };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_metadata",
+      description:
+        "Read image metadata without any model: dimensions, format, mode, byte size, DPI, EXIF. Use to verify a file (including web-downloaded images) kept its real type and size, or to debug rendering issues.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_URL_PROP,
+          image: IMAGE_PROP,
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().metadata({ source: src });
+          return { content: contextBuilder.renderMetadata(res, { source: sourceLabel(args) }) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_crop",
+      description:
+        "Crop a region of an image and save it to disk. Region is a normalized bbox (0-1) in the same shape as senses_detect output: [x1, y1, x2, y2]. Returns the saved file path — feed it back into any other senses_* tool.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_URL_PROP,
+          image: IMAGE_PROP,
+          bbox: {
+            type: "string",
+            description: "Normalized [x1, y1, x2, y2] comma-separated, e.g. '0.2,0.3,0.6,0.7'.",
+          },
+        },
+        required: ["bbox"],
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const bbox = parseBBox(args.bbox as string);
+          const res = await provider().crop({ source: src, bbox });
+          return { content: contextBuilder.renderCrop(res, { source: sourceLabel(args) }) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_zoom",
+      description:
+        "Upscale a region (or the whole image) with LANCZOS and optionally re-analyze it with the model. Small text or fine details that the vision model misses at full-image scale become readable after zooming. 'region' defaults to the whole image.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_URL_PROP,
+          image: IMAGE_PROP,
+          region: REGION_PROP,
+          scale: { type: "number", description: "Upscale factor, 1-8 (default 2)." },
+          analyze: {
+            type: "string",
+            enum: ["none", "ocr", "caption", "query"],
+            description:
+              "Re-analyze the upscaled crop: 'ocr' reads its text, 'caption' describes it, 'query' answers a question (default 'none').",
+          },
+          question: { type: "string", description: "Required when analyze='query'." },
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().zoom({
+            source: src,
+            region: args.region ? parseBBox(args.region) : undefined,
+            scale: args.scale ?? 2,
+            analyze: args.analyze ?? "none",
+            question: args.question,
+          });
+          return { content: contextBuilder.renderZoom(res, { source: sourceLabel(args) }) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_colors",
+      description:
+        "Deterministic color analysis (no model): dominant palette with shares, dark/mid/bright luminance buckets, and average RGB for an image or region. Use for ground-truth checks the vision model can't do reliably.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_URL_PROP,
+          image: IMAGE_PROP,
+          region: REGION_PROP,
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().colors({
+            source: src,
+            region: args.region ? parseBBox(args.region) : undefined,
+          });
+          return { content: contextBuilder.renderColors(res, { source: sourceLabel(args) }) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_diff",
+      description:
+        "Pixel-level comparison of two images: percent changed and the changed-region bounding boxes (anti-aliasing is blurred out). Optionally ask the model to describe what changed via 'describe'. Pass the second image in 'otherPath' (or 'otherImage').",
+      input: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "First image: path or http(s) URL." },
+          image: IMAGE_PROP,
+          otherPath: { type: "string", description: "Second image: path or http(s) URL." },
+          otherImage: { type: "string", description: "Second image as a base64 data URL." },
+          describe: {
+            type: "boolean",
+            description: "Run the vision model on the diff and summarize what changed.",
+          },
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const other = makeImageSource(args.otherPath, args.otherImage);
+          const res = await provider().diff({
+            source: src,
+            other,
+            describe: args.describe ?? false,
+          });
+          return {
+            content: contextBuilder.renderDiff(res, {
+              source: sourceLabel(args),
+              other: args.otherPath ?? "inline-image",
+            }),
+          };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_annotate",
+      description:
+        "Draw bounding boxes and/or points onto an image and save a copy. Takes the same shapes as senses_detect/senses_point output so you can visually validate what the model found. Returns the annotated file path.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_URL_PROP,
+          image: IMAGE_PROP,
+          boxes: {
+            type: "string",
+            description: "JSON array of {x1,y1,x2,y2,label?} normalized boxes.",
+          },
+          points: {
+            type: "string",
+            description: "JSON array of {x,y,label?} normalized points.",
+          },
+          color: { type: "string", description: "Stroke color for boxes/points, e.g. '#ff3355'." },
+          label: { type: "string", description: "Default label for all boxes/points." },
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().annotate({
+            source: src,
+            boxes: args.boxes ? (JSON.parse(args.boxes) as Array<BBox & { label?: string }>) : [],
+            points: args.points
+              ? (JSON.parse(args.points) as Array<{ x: number; y: number; label?: string }>)
+              : [],
+            color: args.color,
+            label: args.label,
+          });
+          return { content: contextBuilder.renderAnnotate(res, { source: sourceLabel(args) }) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+
+    {
+      name: "senses_reverse",
+      description:
+        "Reverse image search. 'local' perceptual-hash search finds near-duplicates in your cache and optional 'dir' (always available, no upload). Remote providers upload the image: 'yandex' (general web), 'saucenao' (anime/illustration art, optional SAUCENAO_API_KEY), 'tracemoe' (anime screenshots, optional TRACE_MOE_TOKEN). Default providers: local,yandex.",
+      input: {
+        type: "object",
+        properties: {
+          path: PATH_URL_PROP,
+          image: IMAGE_PROP,
+          providers: {
+            type: "string",
+            description:
+              "Comma-separated: 'local', 'yandex', 'saucenao', 'tracemoe' (default 'local,yandex'). Remote providers upload the image when explicitly requested.",
+          },
+          dir: {
+            type: "string",
+            description: "Directory to scan for local matches (default: senses cache).",
+          },
+          limit: { type: "number", description: "Max local matches (1-25, default 8)." },
+        },
+        additionalProperties: false,
+      },
+      execute: async (raw) => {
+        const args = raw as ToolArgs;
+        try {
+          const src = makeImageSource(args.path, args.image);
+          const res = await provider().reverse({
+            source: src,
+            providers: args.providers ? args.providers.split(",").map((p) => p.trim()) : undefined,
+            dir: args.dir,
+            limit: args.limit,
+          });
+          return { content: contextBuilder.renderReverse(res) };
+        } catch (err) {
+          return { content: fail(err) };
+        }
+      },
+    },
+  ];
+}
+
 export function parseBBox(s: string): BBox {
   const parts = s.split(",").map((p) => Number(p.trim()));
   if (parts.length !== 4 || parts.some((p) => !Number.isFinite(p))) {

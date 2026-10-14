@@ -137,6 +137,118 @@ export class AttachmentInjector {
     return this.readiness(part);
   }
 
+  /**
+   * V2 prompt-hook handler: analyze attached images and append evidence to
+   * `prompt.text` in place. Idempotent (skips when evidence is already
+   * present), deduplicates identical URIs, and never throws.
+   */
+  async handleV2Prompt(prompt: V2Prompt): Promise<void> {
+    if (typeof prompt.text === "string" && prompt.text.includes("<SENSES Atlas>")) {
+      return;
+    }
+    const files = (prompt.files ?? []).filter((f) => typeof f?.uri === "string" && isV2ImageUri(f.uri));
+    if (files.length === 0) return;
+
+    const seen = new Set<string>();
+    const unique: V2PromptFile[] = [];
+    for (const f of files) {
+      const k = this.keyForUri(f.uri);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      unique.push(f);
+    }
+
+    const blocks: string[] = [];
+    const notes: string[] = [];
+    const warnings: string[] = [];
+    for (const f of unique) {
+      const key = this.keyForUri(f.uri);
+      let record = this.cache.get(key) ?? undefined;
+      if (!record) {
+        record = (await this.analyzeUri(f.uri, key)) ?? undefined;
+        if (record) {
+          this.cache.set(key, record);
+          if (this.cache.size >= this.maxCache) {
+            const oldest = this.cache.keys().next().value;
+            if (oldest !== undefined) this.cache.delete(oldest);
+          }
+        }
+      }
+      if (record?.text) blocks.push(record.text);
+      if (record?.warn) warnings.push(record.warn);
+      const materialized = this.materializeUri(f.uri, key);
+      if (materialized.path) notes.push(materialized.path);
+      else if (materialized.source.type === "path") notes.push(materialized.source.path);
+    }
+
+    const extra: string[] = [];
+    if (blocks.length > 0) extra.push(blocks.join("\n"));
+    if (notes.length > 0) {
+      extra.push(
+        "\n<SENSES Atlas>\nPasted/clipboard images were materialized to disk so you can inspect them directly:\n" +
+          notes.map((n) => `- ${n}\n`).join("") +
+          "Use senses_inspect / senses_ocr / senses_detect with the path above if you need a closer look.\n</SENSES>\n",
+      );
+    }
+    if (warnings.length > 0) {
+      extra.push("\n<SENSES Notice>\n" + warnings.join("\n") + "\n</SENSES>\n");
+    }
+    if (extra.length > 0) {
+      prompt.text = `${prompt.text}\n${extra.join("\n")}`;
+    }
+  }
+
+  private keyForUri(uri: string): string {
+    const local = uriToLocalPath(uri);
+    const stat = local ? statSafe(local) : undefined;
+    return createHash("sha1")
+      .update(uri)
+      .update(stat ? `${stat.size}:${stat.mtimeMs}` : "")
+      .digest("hex");
+  }
+
+  private materializeUri(uri: string, key: string): { source: ImageSource; path?: string } {
+    const local = uriToLocalPath(uri);
+    if (local) return { source: { type: "path", path: resolvePath(local) } };
+    if (/^https?:\/\//i.test(uri)) return { source: { type: "path", path: uri } };
+    if (uri.startsWith("data:")) {
+      const comma = uri.indexOf(",");
+      const head = comma >= 0 ? uri.slice(0, comma) : uri;
+      const b64 = comma >= 0 ? uri.slice(comma + 1) : "";
+      if (!b64) return { source: { type: "data", data: uri } };
+      const mime = /data:([^;,]+)/.exec(head)?.[1] ?? "image/png";
+      const ext = mimeExt(mime);
+      const file = joinPath(tmpdir(), `senses-${key}.${ext}`);
+      try {
+        writeFileSync(file, Buffer.from(b64, "base64"));
+        return { source: { type: "path", path: file }, path: file };
+      } catch (err) {
+        if (process.env.SENSES_DEBUG === "1") {
+          process.stderr.write(`[senses] couldn't materialize paste to ${file}: ${(err as Error).message}\n`);
+        }
+        return { source: { type: "data", data: uri } };
+      }
+    }
+    return { source: { type: "path", path: resolvePath(uri) } };
+  }
+
+  private async analyzeUri(uri: string, key: string): Promise<InjectedEvidence | undefined> {
+    const materialized = this.materializeUri(uri, key);
+    const evidence = await this.analyze(materialized.source, key);
+    if (evidence) {
+      const record = evidence.text
+        ? evidence
+        : { ...evidence, warn: (evidence.warn ?? "No textual evidence could be produced for this image.") };
+      if (this.cache.size >= this.maxCache) {
+        const oldest = this.cache.keys().next().value;
+        if (oldest !== undefined) this.cache.delete(oldest);
+      }
+      this.cache.set(key, record);
+      return record;
+    }
+    return undefined;
+  }
+
   /** Cache-backed analyze: warm the entry if missing, then return it. */
   private async readiness(part: FilePart): Promise<InjectedEvidence | undefined> {
     const key = this.keyFor(part);
@@ -250,6 +362,67 @@ export class AttachmentInjector {
   }
 }
 
+/**
+ * V2 prompt-hook file attachment (OpenCode 2 `PromptInput.FileAttachment`).
+ * Unlike V1 `FilePart` there is no `mime` field — the type is inferred from
+ * the URI (data: prefix, file extension, or remote URL).
+ */
+export interface V2PromptFile {
+  uri: string;
+  name?: string;
+  description?: string;
+  mention?: { start: number; end: number; text: string };
+}
+
+export interface V2Prompt {
+  text: string;
+  files?: V2PromptFile[];
+}
+
+/**
+ * V2 (OpenCode 2) prompt-hook entrypoint.
+ *
+ * V1 injected evidence by pushing a text `Part` onto `chat.message` output
+ * parts. V2's `session.hook("prompt")` hands us a single mutable draft
+ * instead, so evidence is appended to `prompt.text` in place. File
+ * attachments arrive as `{ uri }` (file://, data:, http(s), or plain path)
+ * rather than V1 `FilePart`s.
+ *
+ * There is no V2 equivalent of V1's `message.part.updated` paste-time
+ * preload, so analysis runs synchronously here at admission time. Failures
+ * never throw: the image path is still surfaced so the model can inspect it
+ * manually with senses_inspect().
+ */
+const V2_IMAGE_EXTS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "gif",
+  "bmp",
+  "avif",
+  "tiff",
+  "tif",
+  "heic",
+  "heif",
+  "svg",
+  "pdf",
+]);
+
+export function isV2ImageUri(uri: string): boolean {
+  if (uri.startsWith("data:")) {
+    const head = uri.slice(0, 64).toLowerCase();
+    return head.includes("image/") || head.includes("application/pdf");
+  }
+  const clean = uri.split(/[?#]/, 1)[0] ?? uri;
+  const noScheme = clean.replace(/^file:\/\//, "");
+  const m = /\.([a-z0-9]+)$/i.exec(noScheme);
+  if (m?.[1] && V2_IMAGE_EXTS.has(m[1].toLowerCase())) return true;
+  // Remote URLs without an image extension (signed URLs, CDN handlers):
+  // let them through — PhotonProvider rejects non-images with NOT_AN_IMAGE.
+  if (/^https?:\/\//i.test(uri)) return true;
+  return false;
+}
 function isImageFilePart(part: Part): part is FilePart {
   return (
     part.type === "file" &&
@@ -282,4 +455,17 @@ const MIME_EXT: Record<string, string> = {
 
 function mimeExt(mime: string): string {
   return MIME_EXT[mime] ?? "png";
+}
+
+/** Strip file:// to a local path; undefined for data:/http(s):/bare-relative URIs handled elsewhere. */
+function uriToLocalPath(uri: string): string | undefined {
+  if (uri.startsWith("file://")) {
+    try {
+      return decodeURIComponent(uri.replace(/^file:\/\//, ""));
+    } catch {
+      return uri.replace(/^file:\/\//, "");
+    }
+  }
+  if (/^(data|https?):/i.test(uri)) return undefined;
+  return uri;
 }

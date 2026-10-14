@@ -1,6 +1,6 @@
 {
   "name": "opencode-senses",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Vision for text-only OpenCode models. Attach a screenshot, mockup, or web URL, and the model sees it — grounded OCR, layout, object detection, colors, image diffing, and 13 senses_* tools. Fully local, private, and free.",
   "type": "module",
   "author": {
@@ -20,9 +20,9 @@
     "publish:npm": "npm publish"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "1.17.15",
-    "@opencode-ai/sdk": "1.17.15",
-    "zod": "^4.1.8"
+    "@opencode-ai/plugin": "^1.19.0",
+    "@opencode-ai/sdk": "^1.19.0",
+    "@opencode/plugin": "^2.0.28"
   },
   "devDependencies": {
     "@types/bun": "latest",

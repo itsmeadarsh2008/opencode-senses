@@ -155,12 +155,16 @@ Example: `SENSES_MODEL=moondream2` (default), `moondream/moondream3-preview`, or
 
 2. **Enable the plugin** in OpenCode's config. Open `opencode.jsonc` in your project (or your global OpenCode config) and add:
 
-   ```json
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "plugin": ["opencode-senses"]
-   }
-   ```
+    ```json
+    {
+      "$schema": "https://opencode.ai/config.json",
+      "plugins": ["opencode-senses"]
+    }
+    ```
+
+    > OpenCode 2 uses `plugins` with `{ "package", "options" }` objects (below).
+    > OpenCode 1.18.29+ loads the same build through its V1 `server()`
+    > entrypoint; older V1 releases should pin `opencode-senses@0.2.5`.
 
 3. **Done.** Restart OpenCode. On your first vision call, Senses provisions its own Python runtime: it creates a virtualenv under `~/.cache/opencode-senses/venv`, installs `moondream`, and downloads the model weights (~3.9 GB) from Hugging Face. Everything after that is fast and offline. Like a cave, but for models.
 
@@ -171,7 +175,7 @@ Example: `SENSES_MODEL=moondream2` (default), `moondream/moondream3-preview`, or
 Plugin options for npm installs:
 
 ```json
-"plugin": [["opencode-senses", { "autoInspect": false }]]
+{ "plugins": [{ "package": "opencode-senses", "options": { "autoInspect": false } }] }
 ```
 
 ### Install from source
@@ -189,10 +193,10 @@ bun install
 bun run build
 
 # 3. Point OpenCode at the built plugin
-#    "plugin": ["./opencode-senses/dist/plugin.js"]
+#    "plugins": ["./opencode-senses/dist/plugin.js"]
 ```
 
-During development you can point at the source directly: `"plugin": ["./opencode-senses/src/plugin.ts"]`.
+During development you can point at the source directly: `"plugins": ["./opencode-senses/src/plugin.ts"]`.
 
 The model weights (~3.9 GB for Moondream 2) download automatically from Hugging Face on first use and cache under `~/.cache/huggingface`. Allegedly a one-time download, much like "one last browser tab".
 
@@ -350,13 +354,13 @@ Plugin options in `opencode.json`:
 
 ```json
 {
-  "plugin": [
-    ["./opencode-senses/dist/plugin.js", {
+  "plugins": [
+    { "package": "./opencode-senses/dist/plugin.js", "options": {
       "enabled": true,
       "autoInspect": true,
       "reverseSearch": "auto",
       "fetchTimeoutMs": 60000
-    }]
+    } }
   ]
 }
 ```
